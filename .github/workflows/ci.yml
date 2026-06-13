@@ -23,8 +23,10 @@ jobs:
       - run: pnpm db:generate
       - name: typecheck
         run: pnpm typecheck
-      - name: unit tests (advisory until T1 lands the engine)
-        run: pnpm test
+      - name: unit tests + coverage gate (T1 engine landed; vitest threshold 90% lines / 80% branches)
+        run: pnpm test:coverage
+        # Advisory on intra-build pushes (runbook gap #8). The integrator drops continue-on-error
+        # at the integration/release gate to make the suite + coverage threshold blocking.
         continue-on-error: true
       - name: eval gate (local fallback)
         run: pnpm eval
