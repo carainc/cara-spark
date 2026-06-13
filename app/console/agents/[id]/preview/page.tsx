@@ -59,7 +59,10 @@ export default async function AgentPreviewPage({ params }: { params: Promise<{ i
           </h1>
         </header>
         <div className="mt-5">
-          <Chat lang={lang} />
+          {/* Operator preview: show the full provable trace EXPANDED by default (beat-1 demo needs the
+              trace visible to operators). The patient pages leave showTrace unset → collapsed toggle.
+              agentId is REQUIRED for the tenant-scoped referral RAG (food-bank etc.) + audit persistence. */}
+          <Chat agentId={id} lang={lang} showTrace />
         </div>
       </div>
 

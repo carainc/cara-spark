@@ -12,7 +12,7 @@
  */
 import type { AgentStatus, ChannelKind, Language, Role } from '@prisma/client';
 import { canManageAgents } from './roles';
-import { DEFAULT_POLICY_BUNDLE_VERSION, demoPhoneDid } from './bundle';
+import { DEFAULT_POLICY_BUNDLE_VERSION, demoPhoneDid, isKnownBundleVersion } from './bundle';
 
 /** Channels the creator can toggle in the console (KIOSK is provisioned elsewhere). */
 export const TOGGLEABLE_CHANNELS = ['CHAT', 'VOICE', 'PHONE'] as const;
@@ -26,6 +26,10 @@ export interface AgentRow {
   status: AgentStatus;
   policyBundleVersion: string;
   language: Language;
+  // Agent customization (tk-0015) — TONE/STYLE only; the engine still owns every disposition.
+  persona?: string | null;
+  systemPromptExtra?: string | null;
+  additionalInstructions?: string | null;
 }
 
 export interface ChannelRow {
@@ -130,4 +134,82 @@ export interface PublishAgentInput {
 export async function publishAgent(db: AgentPrisma, input: PublishAgentInput): Promise<AgentRow> {
   if (!canManageAgents(input.actorRole)) throw new Error('Forbidden: insufficient role to publish an agent.');
   return db.agent.update({ where: { id: input.agentId }, data: { status: 'PUBLISHED' } });
+}
+
+export interface SetPolicyBundleInput {
+  actorRole: Role | undefined | null;
+  agentId: string;
+  /** A version string from the available signed bundles (GET /api/bundles). */
+  policyBundleVersion: string;
+}
+
+/**
+ * Set the agent's policy bundle (tk-0017). Writes ONLY Agent.policyBundleVersion — the runtime
+ * resolves the signed bundle from this string. Guarded by manage capability AND fail-closed on an
+ * unknown version: an arbitrary string can never become an agent's safety contract. Auth still
+ * never adjudicates — it only records which signed bundle the deterministic engine should load.
+ */
+export async function setAgentPolicyBundle(db: AgentPrisma, input: SetPolicyBundleInput): Promise<AgentRow> {
+  if (!canManageAgents(input.actorRole)) throw new Error('Forbidden: insufficient role to change the policy bundle.');
+  if (!isKnownBundleVersion(input.policyBundleVersion)) {
+    throw new Error(`Unknown policy bundle version: ${input.policyBundleVersion}`);
+  }
+  return db.agent.update({
+    where: { id: input.agentId },
+    data: { policyBundleVersion: input.policyBundleVersion },
+  });
+}
+
+export interface UpdateAgentCustomizationInput {
+  actorRole: Role | undefined | null;
+  agentId: string;
+  /** Short tone note. Empty/whitespace clears it (→ null). */
+  persona?: string | null;
+  /** Extra system-prompt text. Empty/whitespace clears it (→ null). */
+  systemPromptExtra?: string | null;
+  /** Extra task/style guidance. Empty/whitespace clears it (→ null). */
+  additionalInstructions?: string | null;
+}
+
+/** Trim a free-text field; empty/whitespace becomes null so a cleared box round-trips to NULL. */
+function normalizeText(v: string | null | undefined): string | null {
+  if (v == null) return null;
+  const trimmed = v.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+/**
+ * Update an agent's TONE/STYLE customization (tk-0015): persona, extra system-prompt text, and
+ * additional instructions. Guarded by manage capability. These fields tune the conversational VOICE
+ * ONLY — they are appended to the model's system prompt AFTER the hard rules under a guardrail (see
+ * lib/agent/extract.ts buildSystemPrompt) and can NEVER change the engine's disposition. Auth still
+ * never adjudicates: it only records the voice the model speaks in. Each field is trimmed; an empty
+ * box is stored as NULL so the base prompt is used unchanged.
+ */
+export async function updateAgentCustomization(
+  db: AgentPrisma,
+  input: UpdateAgentCustomizationInput,
+): Promise<AgentRow> {
+  if (!canManageAgents(input.actorRole)) {
+    throw new Error('Forbidden: insufficient role to customize an agent.');
+  }
+  return db.agent.update({
+    where: { id: input.agentId },
+    data: {
+      persona: normalizeText(input.persona),
+      systemPromptExtra: normalizeText(input.systemPromptExtra),
+      additionalInstructions: normalizeText(input.additionalInstructions),
+    },
+  });
+}
+
+/**
+ * Build the PUBLIC link to a PUBLISHED agent's branded page. The route is `/a/{tenant}/{agentSlug}`
+ * (app/a/[tenant]/[agentSlug]), so the URL is `<base>/a/<tenant-slug>/<agent-slug>`. `base` is the
+ * deploy's public origin — `AUTH_URL` (mirrored to NEXTAUTH_URL) or the request origin. Pure +
+ * trailing-slash safe so it is trivially unit-testable. Slugs are already URL-safe (see `slugify`).
+ */
+export function agentPublicUrl(base: string, tenantSlug: string, agentSlug: string): string {
+  const origin = base.replace(/\/+$/, '');
+  return `${origin}/a/${tenantSlug}/${agentSlug}`;
 }

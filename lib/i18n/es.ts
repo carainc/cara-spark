@@ -31,6 +31,120 @@ export const es: Dict = {
     welcome: 'Bienvenido',
     superAdmin: 'Super-administrador',
     createAgent: 'Crear un agente de triaje',
+    nav: {
+      agents: 'Agentes',
+      resources: 'Recursos',
+      calls: 'Auditoría',
+    },
+    shellSubtitle: 'Configure agentes de triaje a prueba de fallos. El motor decide cada disposición.',
+  },
+  // Página pública (tk-0015). La tesis primero: el modelo propone, el motor decide — de forma verificable.
+  landing: {
+    eyebrow: 'Código abierto · autoalojable · use su propia clave',
+    headline: 'Triaje que se puede comprobar,',
+    headlineAccent: 'no solo creer.',
+    subhead:
+      'Un agente de triaje médico a prueba de fallos para centros de salud comunitarios y los pacientes que atienden. Un motor determinista — no el modelo de lenguaje — toma cada decisión de seguridad, y cada decisión es verificable y reproducible.',
+    primaryCta: 'Crear un agente de triaje',
+    secondaryCta: 'Ver una decisión real',
+    pillarsTitle: 'Diseñado para la atención de redes de seguridad',
+    pillar1Title: 'El motor decide',
+    pillar1Body: 'El modelo solo propone evidencia. Un motor de políticas firmado decide — las señales de alarma siempre dominan y falla de forma segura hacia una persona.',
+    pillar2Title: 'Verificable y reproducible',
+    pillar2Body: 'Cada disposición lleva un sello de verificación: la versión de la política, una suma de verificación y una firma. Nada se acepta a ciegas.',
+    pillar3Title: 'Integrado por defecto',
+    pillar3Body: 'Bilingüe EN/ES, sin datos del paciente en el modelo y un pie de página de crisis en cada pantalla. La accesibilidad es la base, no un agregado.',
+    traceDemoLabel: 'Decisión del motor — ejemplo',
+    traceDemoModel: 'El modelo propuso',
+    traceDemoEvidence: 'dolor_de_pecho = sí · dificultad_para_respirar = sí',
+    traceDemoEngine: 'El motor decidió',
+    traceDemoLocked: 'Bloqueado — el modelo no puede suavizar esto.',
+  },
+  // Configuración del agente por pestañas (tk-0022; incluye el selector de paquete de tk-0017).
+  agentConfig: {
+    back: 'Agentes',
+    statusDraft: 'Borrador',
+    statusPublished: 'Publicado',
+    statusArchived: 'Archivado',
+    saveChannels: 'Guardar canales',
+    publish: 'Publicar',
+    published: 'Guardado y publicado.',
+    tabs: {
+      general: 'General',
+      channels: 'Canales',
+      policies: 'Políticas y paquetes',
+      corpus: 'Corpus / RAG',
+      preview: 'Vista previa',
+    },
+    general: {
+      title: 'General',
+      subtitle: 'Cómo se identifica este agente. La identidad nunca afecta una disposición de triaje.',
+      nameLabel: 'Nombre del agente',
+      slugLabel: 'Identificador de la URL pública',
+      languageLabel: 'Idioma predeterminado',
+      personaLabel: 'Nota de personalidad',
+      personaHelp:
+        'Una breve nota de tono para la voz conversacional. Nunca anula al motor — el texto clínico siempre es la guía predefinida y autorizada por la política.',
+      personaPlaceholder: 'p. ej. Cálido, en lenguaje sencillo, tranquilizador; habla con un cuidador preocupado.',
+      systemPromptExtraLabel: 'Adición al sistema',
+      systemPromptExtraHelp:
+        'Texto adicional que se añade al prompt de sistema del modelo. Solo tono y estilo — queda detrás de una barrera y nunca puede cambiar una disposición, fijar una urgencia ni anular al motor.',
+      systemPromptExtraPlaceholder: 'p. ej. Use frases cortas. Reconozca la preocupación de la persona antes de la siguiente pregunta.',
+      additionalInstructionsLabel: 'Instrucciones adicionales',
+      additionalInstructionsHelp:
+        'Guía conversacional adicional para la voz. Solo tono y estilo — nunca umbrales clínicos ni el próximo paso. El motor sigue decidiéndolo todo.',
+      additionalInstructionsPlaceholder: 'p. ej. Salude en el idioma de la persona; evite la jerga médica.',
+      customizationNote:
+        'Esto ajusta solo el tono. El modelo sigue solo PROPONIENDO; el motor determinista toma cada decisión clínica y esto nunca puede anularlo.',
+      save: 'Guardar personalización',
+      saved: 'Personalización guardada.',
+      publicLinkLabel: 'Enlace público',
+      publicLinkHelp: 'Este agente está publicado. Las personas pueden acceder aquí:',
+      publicLinkDraftNote: 'Aquí aparecerá un enlace público una vez que se publique este agente.',
+      readonlyNote: 'El nombre y el identificador se definen al crear el agente en esta versión.',
+    },
+    channels: {
+      title: 'Canales',
+      subtitle: 'Active o desactive las superficies de entrega. El motor determinista funciona igual en cada una.',
+      chat: 'Chat (web)',
+      voice: 'Voz (web)',
+      phone: 'Teléfono',
+      didLabel: 'Número (solo lectura)',
+      didWhenEnabled: 'se muestra al activar',
+      didNote: 'Solo visualización — Cara Spark nunca compra ni escribe un número, y nunca toca la infraestructura de voz de producción.',
+    },
+    policies: {
+      title: 'Paquete de políticas',
+      subtitle:
+        'El paquete de políticas firmado es el contrato de seguridad. El motor verifica su suma de verificación y su firma antes de cada decisión; el modelo nunca puede editarlo.',
+      selectLabel: 'Paquete de políticas activo',
+      activeBadge: 'Activo',
+      defaultBadge: 'Predeterminado firmado',
+      versionLabel: 'Versión',
+      signedByLabel: 'Firmado por',
+      checksumLabel: 'Suma de verificación',
+      signatureLabel: 'Firma',
+      signatureVerified: 'firma verificada',
+      signatureUnsigned: 'sin firmar (paquete predeterminado)',
+      checksumOk: 'suma de verificación correcta',
+      rulesTitle: 'Reglas de alarma en este paquete',
+      ruleForces: 'fuerza',
+      save: 'Establecer paquete de políticas',
+      saved: 'Paquete de políticas actualizado.',
+      lockNote: 'Las señales de alarma siempre dominan y el motor falla de forma segura hacia una persona. El modelo no puede suavizar una regla activada.',
+      loadError: 'No se pudieron cargar los paquetes de políticas.',
+    },
+    corpus: {
+      title: 'Corpus de derivación',
+      subtitle:
+        'Recursos comunitarios que este agente puede CITAR en una derivación. Solo informativo — nunca cambian una disposición clínica. Las cargas con datos del paciente se rechazan.',
+    },
+    preview: {
+      title: 'Vista previa',
+      subtitle: 'La experiencia del paciente con la marca de este agente. Un borrador se previsualiza aquí antes de publicar.',
+      open: 'Abrir vista previa completa',
+      draftNote: 'La vista previa refleja el borrador actual. La página pública se activa solo después de publicar.',
+    },
   },
   calls: {
     title: 'Registro de auditoría de llamadas',
@@ -93,6 +207,18 @@ export const es: Dict = {
     agentLabel: 'Cara Spark',
     restart: 'Empezar de nuevo',
     errorGeneric: 'Algo salió mal al revisar eso. Inténtelo de nuevo o llame a su clínica. Si es una emergencia, llame al 911.',
+    // Se muestra mientras la conversación aún recopila información (el motor TODAVÍA no ha llegado a un
+    // próximo paso seguro y confiable). La pregunta de seguimiento del modelo aparece como un mensaje
+    // arriba; esta línea invita amablemente a la siguiente respuesta. NO es una tarjeta de "esto
+    // necesita una persona" — eso se reserva para un bloqueo de seguridad real / bandera roja, que
+    // siempre se muestra de inmediato.
+    continuePrompt: 'Cuénteme un poco más para indicarle el próximo paso más seguro.',
+    // El control de razonamiento, solo para operadores y colapsado por defecto. La traza verificable
+    // vive detrás de esto en el chat del paciente; la vista previa del operador la muestra expandida.
+    showReasoning: 'Mostrar razonamiento (depuración)',
+    showReasoningHint: 'Vista de operador — la traza de decisión verificable del motor.',
+    socialNeedGuidance:
+      'Parece que está buscando apoyo comunitario más que atención médica — aquí hay algunos recursos locales que podrían ayudar. Si algo en su salud cambia, puede iniciar una nueva consulta en cualquier momento.',
     guidance: {
       SELF_CARE_INFO_ONLY:
         'Según lo que compartió, esto suele poder manejarse con autocuidado en casa. Vigile sus síntomas, descanse e hidrátese. Si algo empeora o le preocupa, comuníquese con su clínica.',

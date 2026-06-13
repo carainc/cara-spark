@@ -17,13 +17,13 @@
  * patient typed. We never read or forward an identifier. Persistence (Lane F `recordCall`) stores the
  * PHI-free trace under an opaque identityRef only.
  */
-import { activePolicyBundle } from '@/engine/policy-bundle';
+import { activePolicyBundle, getRegisteredBundle } from '@/engine';
 import { recordCall } from '@/lib/audit/producer';
 import { prisma } from '@/lib/db';
 import { toModelIdentityContext } from '@/lib/identity/model-context';
 import { unverifiedIdentity, type VerifiedIdentity } from '@/lib/identity/types';
 import { runTurn, type TracePanelView, type ReferralView } from '@/lib/agent/loop';
-import { defaultCreateMessage, type ChatTurn } from '@/lib/agent/extract';
+import { defaultCreateMessage, type AgentCustomization, type ChatTurn } from '@/lib/agent/extract';
 import {
   retrieveResources,
   createOpenAIEmbedder,
@@ -32,6 +32,7 @@ import {
   type ReferralCitation,
 } from '@/lib/rag';
 import type { ReferralDeps } from '@/lib/agent/referral';
+import type { PolicyBundle } from '@/engine/types';
 import type { Lang } from '@/lib/i18n';
 
 export interface TurnRequest {
@@ -78,6 +79,45 @@ async function buildReferralDeps(agentId?: string): Promise<ReferralDeps | undef
 }
 
 /**
+ * Load the agent's TONE/STYLE customization (tk-0015) — persona / extra system-prompt text /
+ * additional instructions. These tune the conversational VOICE only; they are appended to the model
+ * system prompt after the hard rules under a guardrail (see buildSystemPrompt) and can NEVER change
+ * the engine's disposition. Returns undefined when there is no agent or no customization set, so the
+ * base prompt is used unchanged. Best-effort: a DB hiccup here just means the default voice.
+ */
+async function loadAgentCustomization(agentId?: string): Promise<AgentCustomization | undefined> {
+  if (!agentId) return undefined;
+  const agent = await prisma.agent.findUnique({
+    where: { id: agentId },
+    select: { persona: true, systemPromptExtra: true, additionalInstructions: true },
+  });
+  if (!agent) return undefined;
+  if (!agent.persona && !agent.systemPromptExtra && !agent.additionalInstructions) return undefined;
+  return {
+    persona: agent.persona,
+    systemPromptExtra: agent.systemPromptExtra,
+    additionalInstructions: agent.additionalInstructions,
+  };
+}
+
+/**
+ * Resolve the agent's SIGNED policy bundle (tk-0025). Reads Agent.policyBundleVersion and looks it up
+ * in the engine's registry, so the Triage Demo agent (wired to `familymed-v1` in db/seed) adjudicates
+ * against the family-medicine gates while other agents keep the default. Falls back to the signed
+ * DEFAULT bundle when there is no agent or the version is not registered — fail-safe to the default,
+ * never an unverified or absent bundle. The bundle is still verified by the engine on adjudication.
+ */
+async function resolveAgentBundle(agentId?: string): Promise<PolicyBundle> {
+  if (!agentId) return activePolicyBundle();
+  const agent = await prisma.agent.findUnique({
+    where: { id: agentId },
+    select: { policyBundleVersion: true },
+  });
+  const resolved = agent?.policyBundleVersion ? getRegisteredBundle(agent.policyBundleVersion) : null;
+  return resolved ?? activePolicyBundle();
+}
+
+/**
  * Run a turn. The model call uses the BYO ANTHROPIC_API_KEY via `defaultCreateMessage`. On any model
  * error we fail safe to a generic message (the engine never sees malformed input — we just surface an
  * error). This action is intentionally thin: all logic lives in the unit-tested lib/agent modules.
@@ -88,13 +128,17 @@ export async function submitTurn(req: TurnRequest): Promise<TurnResponse> {
     const modelIdentity = toModelIdentityContext(identity);
     const lang = req.lang === 'es' ? 'es' : 'en';
 
-    // The signed-when-a-secret-is-set default bundle — the engine verifies + reports its signature.
-    const bundle = activePolicyBundle();
+    // The agent's SIGNED policy bundle (familymed-v1 for the Triage Demo agent; default otherwise) —
+    // the engine verifies + reports its signature. Falls back to the signed default (never absent).
+    const bundle = await resolveAgentBundle(req.agentId);
     const createMessage = await defaultCreateMessage();
     // Best-effort RAG seam; failure to build it just means no referral (never blocks the turn).
     const referralDeps = await buildReferralDeps(req.agentId).catch(() => undefined);
+    // Best-effort TONE/STYLE customization; failure just means the default voice (never blocks the turn).
+    const custom = await loadAgentCustomization(req.agentId).catch(() => undefined);
 
     // MODEL PROPOSES → ENGINE DECIDES → canned guidance + provable trace → advisory referral.
+    // `custom` is tone-only: it shades the voice in the system prompt but cannot change the disposition.
     const { trace, panel, assistantText, referral } = await runTurn({
       createMessage,
       lang,
@@ -102,6 +146,7 @@ export async function submitTurn(req: TurnRequest): Promise<TurnResponse> {
       history: req.history,
       bundle,
       referral: referralDeps,
+      custom,
     });
 
     // PERSIST the PHI-free trace (failsafe save — demo beat 1). Best-effort: a DB hiccup must not
@@ -122,7 +167,10 @@ export async function submitTurn(req: TurnRequest): Promise<TurnResponse> {
     }
 
     return { ok: true, panel, assistantText, referral };
-  } catch {
+  } catch (err) {
+    // Surface server-side so a misconfig (bad key, rejected model/params) is diagnosable in logs.
+    // The patient still sees only the safe generic error — no internals leak to the browser.
+    console.error('[agent] submitTurn failed:', err instanceof Error ? err.message : err);
     return { ok: false, error: 'turn_failed' };
   }
 }

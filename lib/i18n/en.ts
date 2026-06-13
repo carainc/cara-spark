@@ -29,6 +29,121 @@ export const en = {
     welcome: 'Welcome',
     superAdmin: 'Super-admin',
     createAgent: 'Create a triage agent',
+    nav: {
+      agents: 'Agents',
+      resources: 'Resources',
+      calls: 'Audit trail',
+    },
+    shellSubtitle: 'Configure failsafe triage agents. The engine owns every disposition.',
+  },
+  // Public landing (tk-0015). The thesis up front: the model proposes, the engine decides — provably.
+  landing: {
+    eyebrow: 'Open-source · self-hostable · BYO-key',
+    headline: 'Triage you can prove,',
+    headlineAccent: 'not just trust.',
+    subhead:
+      'A failsafe medical-triage agent for community health centers and the patients they serve. A deterministic engine — not the language model — makes every safety decision, and every decision is provable and replayable.',
+    primaryCta: 'Create a triage agent',
+    secondaryCta: 'See a live decision',
+    pillarsTitle: 'Built for safety-net care',
+    pillar1Title: 'The engine decides',
+    pillar1Body: 'The model only proposes evidence. A signed policy engine adjudicates — red flags always dominate, and it fails closed to a human.',
+    pillar2Title: 'Provable, replayable',
+    pillar2Body: 'Every disposition carries a verification stamp: the policy version, a checksum, and a signature. Nothing is taken on faith.',
+    pillar3Title: 'Built-in by default',
+    pillar3Body: 'Bilingual EN/ES, no PHI in the model, and a crisis safety footer on every screen. Accessibility is the foundation, not an add-on.',
+    traceDemoLabel: 'Engine decision — example',
+    traceDemoModel: 'Model proposed',
+    traceDemoEvidence: 'chest_pain = true · shortness_of_breath = true',
+    traceDemoEngine: 'Engine decided',
+    traceDemoLocked: 'Locked — the model cannot soften this.',
+  },
+  // Tabbed agent configuration (tk-0022; absorbs the tk-0017 bundle selector). Surfaces existing
+  // backends only — channels (Lane E), the signed policy bundle (engine), corpus (Lane F), preview.
+  agentConfig: {
+    back: 'Agents',
+    statusDraft: 'Draft',
+    statusPublished: 'Published',
+    statusArchived: 'Archived',
+    saveChannels: 'Save channels',
+    publish: 'Publish',
+    published: 'Saved and published.',
+    tabs: {
+      general: 'General',
+      channels: 'Channels',
+      policies: 'Policies & Bundles',
+      corpus: 'Corpus / RAG',
+      preview: 'Preview',
+    },
+    general: {
+      title: 'General',
+      subtitle: 'How this agent identifies itself. Identity never touches a triage disposition.',
+      nameLabel: 'Agent name',
+      slugLabel: 'Public URL slug',
+      languageLabel: 'Default language',
+      personaLabel: 'Persona note',
+      personaHelp:
+        'A short tone note for the conversational voice. It never overrides the engine — the clinical text is always the canned, policy-authored guidance.',
+      personaPlaceholder: 'e.g. Warm, plain-language, reassuring; speaks to a worried caregiver.',
+      systemPromptExtraLabel: 'System-prompt addition',
+      systemPromptExtraHelp:
+        'Extra text appended to the model’s system prompt. Tone and style only — it sits behind a guardrail and can never change a disposition, set an urgency, or override the engine.',
+      systemPromptExtraPlaceholder: 'e.g. Use short sentences. Acknowledge the caller’s worry before asking the next question.',
+      additionalInstructionsLabel: 'Additional instructions',
+      additionalInstructionsHelp:
+        'Extra conversational guidance for the voice. Tone and style only — never clinical thresholds, never the next step. The engine still decides everything.',
+      additionalInstructionsPlaceholder: 'e.g. Greet in the caller’s language; avoid medical jargon.',
+      customizationNote:
+        'These tune tone only. The model still just PROPOSES; the deterministic engine makes every clinical decision and these can never override it.',
+      save: 'Save customization',
+      saved: 'Customization saved.',
+      publicLinkLabel: 'Public link',
+      publicLinkHelp: 'This agent is published. Patients can reach it here:',
+      publicLinkDraftNote: 'A public link appears here once this agent is published.',
+      readonlyNote: 'Name and slug are set at creation in this build.',
+    },
+    channels: {
+      title: 'Channels',
+      subtitle: 'Turn delivery surfaces on or off. The deterministic engine runs identically on each.',
+      chat: 'Chat (web)',
+      voice: 'Voice (web)',
+      phone: 'Phone',
+      didLabel: 'Number (read-only)',
+      didWhenEnabled: 'shown when enabled',
+      didNote: 'Display only — Cara Spark never buys or writes a number, and never touches the production voice stack.',
+    },
+    policies: {
+      title: 'Policy bundle',
+      subtitle:
+        'The signed policy bundle is the safety contract. The engine verifies its checksum and signature before every decision; the model can never edit it.',
+      selectLabel: 'Active policy bundle',
+      activeBadge: 'Active',
+      defaultBadge: 'Signed default',
+      versionLabel: 'Version',
+      signedByLabel: 'Signed by',
+      checksumLabel: 'Checksum',
+      signatureLabel: 'Signature',
+      signatureVerified: 'signature verified',
+      signatureUnsigned: 'unsigned (default bundle)',
+      checksumOk: 'checksum ok',
+      rulesTitle: 'Red-flag rules in this bundle',
+      ruleForces: 'forces',
+      save: 'Set policy bundle',
+      saved: 'Policy bundle updated.',
+      lockNote: 'Red flags always dominate and the engine fails closed to a human. The model cannot soften a fired rule.',
+      loadError: 'Could not load policy bundles.',
+    },
+    corpus: {
+      title: 'Referral corpus',
+      subtitle:
+        'Community resources this agent may CITE in a referral. Advisory only — they never change a clinical disposition. PHI-shaped uploads are rejected.',
+    },
+    preview: {
+      title: 'Preview',
+      subtitle: 'The branded patient experience for this agent. A draft previews here before you publish.',
+      open: 'Open full preview',
+      draftNote: 'Preview reflects the current draft. The public page goes live only after you publish.',
+    },
   },
   calls: {
     title: 'Call audit trail',
@@ -96,6 +211,19 @@ export const en = {
     agentLabel: 'Cara Spark',
     restart: 'Start over',
     errorGeneric: 'Something went wrong reviewing that. Please try again, or call your clinic. If this is an emergency, call 911.',
+    // Shown while the conversation is still gathering information (the engine has NOT yet reached a
+    // confident, safe next step). The model's follow-up question appears as a chat bubble above; this
+    // line gently invites the next reply. NOT a "this needs a person" card — that is reserved for a
+    // genuine safety block / red flag, which always presents immediately.
+    continuePrompt: 'Tell me a bit more so I can point you to the safest next step.',
+    // The collapsed, operator-only reasoning toggle. The provable trace lives behind this in the
+    // patient chat (collapsed by default); the operator preview shows it expanded.
+    showReasoning: 'Show reasoning (debug)',
+    showReasoningHint: 'Operator view — the engine’s provable decision trace.',
+    // Shown when the deterministic engine routes a PURE social/resource (SDOH) request — never the
+    // clinical self-care text. The community-resource referral (e.g. a food bank) is appended below it.
+    socialNeedGuidance:
+      "It sounds like you're looking for community support rather than medical care — here are some local resources that may help. If anything about your health changes, you can start a new check anytime.",
     // Canned guidance per AllowedAction — the ONLY clinical text the agent emits. The model cannot write these.
     guidance: {
       SELF_CARE_INFO_ONLY:

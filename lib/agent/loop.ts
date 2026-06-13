@@ -12,6 +12,11 @@
  * engine's binding decision. That is the thesis, enforced by data flow: `adjudicate` consumes only
  * the typed evidence + risk, and `guidanceFor` is keyed by `trace.decision.action`.
  *
+ * Multi-turn: the engine adjudicates EVERY turn (unchanged), but the panel carries a `turnMode`
+ * (`buildTracePanel` → `decideTurnMode`) so the UI knows whether to CONVERSE (a no-red-flag, low
+ * confidence/coverage block → keep gathering info) or PRESENT a final safe next step. Emergencies,
+ * red flags, and fail-closed blocks always present — the decision itself is untouched here.
+ *
  * tk-0012 / tk-0018: the loop adjudicates against `activePolicyBundle()` — the OSS DEFAULT_POLICY
  * SIGNED with VOICE_CONFIG_HMAC_SECRET when it is set — so the provable trace renders
  * "signature verified ✓" in the demo (and "unsigned" locally with no secret). The engine reads the
@@ -28,6 +33,7 @@ import type { ModelIdentityContext } from '@/lib/identity/model-context';
 import type { Lang } from '@/lib/i18n';
 import {
   proposeAssessment,
+  type AgentCustomization,
   type AgentLang,
   type ChatTurn,
   type CreateMessage,
@@ -51,6 +57,13 @@ export interface RunTurnArgs {
    * embedding key) and the referral is simply skipped — the disposition is never affected.
    */
   referral?: ReferralDeps;
+  /**
+   * Optional per-agent TONE/STYLE customization (tk-0015) — persona / extra system-prompt text /
+   * additional instructions. Threaded into the model's system prompt AFTER the hard rules, under a
+   * guardrail. Tone-only by construction: it can shade voice/warmth but can NEVER change the
+   * engine's disposition (the model still only proposes; the engine decides).
+   */
+  custom?: AgentCustomization;
   traceId?: string;
 }
 
@@ -78,6 +91,7 @@ export async function runTurn(args: RunTurnArgs): Promise<RunTurnResult> {
     identity: args.identity,
     history: args.history,
     traceId: args.traceId,
+    custom: args.custom,
   });
 
   // 2) ENGINE DECIDES — deterministic adjudication against the verified bundle. Binding.
@@ -94,11 +108,14 @@ export async function runTurn(args: RunTurnArgs): Promise<RunTurnResult> {
   //    input, and returns decoration or null. For emergency dispositions it returns null (emergency
   //    first); on any RAG failure it degrades to null. It is structurally incapable of changing the
   //    action: it never feeds back into `adjudicate` and never writes `trace`/`panel.action`.
+  //    tk-0027: a SDOH social-needs request lands on SELF_CARE_INFO_ONLY (engine lane), which is
+  //    referral-eligible — so a pure "I'm looking for food" surfaces the community food-bank resource
+  //    here, still decision-inert.
   const referral = await maybeBuildReferral(trace, args.lang, args.referral);
 
   return { trace, panel, assistantText: proposal.assistantText, referral };
 }
 
 export type { TracePanelView } from './guidance';
-export type { ChatTurn, CreateMessage, AgentLang } from './extract';
+export type { AgentCustomization, ChatTurn, CreateMessage, AgentLang } from './extract';
 export type { ReferralDeps, ReferralRetrieve, ReferralView } from './referral';

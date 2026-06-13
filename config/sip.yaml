@@ -12,11 +12,14 @@
 #   default_primary_fqdn_id set, DTMF=RFC2833, inbound.codecs forced to [G711U, G711A],
 #   IP-allowlist auth (Telnyx US signaling /24s), FQDN → the EC2 EIP:5060.
 #
-# Keys are env-driven on the box (SIP_API_KEY / SIP_API_SECRET match the LiveKit server keys).
-# The devkey below is a LOCAL-ONLY placeholder (NOT a secret).
-
-api_key: ${SIP_API_KEY}
-api_secret: ${SIP_API_SECRET}
+# Keys are env-driven (must match the LiveKit server keys). ‼️ Like livekit-server, the SIP service
+# does NOT expand ${ENV} inside this YAML — it yaml.Unmarshals the body verbatim. A line such as
+# `api_key: ${SIP_API_KEY}` would set the API key to the LITERAL string "${SIP_API_KEY}", overwriting
+# the value the binary already read from the LIVEKIT_API_KEY env var, and SIP would then fail to
+# authenticate to the LiveKit server (which silently blocks trunk/dispatch creation — Fix C).
+# So api_key/api_secret are intentionally OMITTED here: the SIP binary reads them from the
+# LIVEKIT_API_KEY / LIVEKIT_API_SECRET env vars (wired in docker-compose.yml `livekit-sip` from the
+# SIP_API_KEY / SIP_API_SECRET values), and an omitted YAML key leaves those env defaults intact.
 ws_url: ws://livekit:7880
 
 redis:

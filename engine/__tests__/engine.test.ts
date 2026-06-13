@@ -252,3 +252,97 @@ describe('tk-0018 — adjudicate trace signatureValid is a REAL HMAC verify (not
     expect(trace.bundle.signatureValid).toBe(false);
   });
 });
+
+describe('tk-0020 — signed-but-invalid bundle is ENFORCED fail-closed (not just reported)', () => {
+  const SECRET = 'x'.repeat(40);
+  afterEach(() => vi.unstubAllEnvs());
+
+  // The teeth of the fix: a bundle whose RULES were tampered (infant-fever-floor stripped) AND that
+  // carries a (now-invalid) signature must NOT adjudicate against the attacker's softened rules. Were
+  // the engine fail-open, this evidence would yield a low-severity action (no red flag → routine);
+  // fail-closed it must BLOCK_AND_HUMAN_HANDOFF.
+  it('(a) a forged/tampered signed bundle → BLOCK_AND_HUMAN_HANDOFF, NOT the tampered rules verdict', () => {
+    vi.stubEnv('VOICE_CONFIG_HMAC_SECRET', SECRET);
+    // Sign the real default, then tamper the rules → the signature no longer matches the content.
+    const signed = signBundle(DEFAULT_POLICY, SECRET);
+    const tamperedSigned = {
+      ...signed,
+      // strip the infant-fever-floor rule the attacker wants to dodge
+      redFlagRules: signed.redFlagRules.filter((r) => r.id !== 'infant-fever-floor'),
+    };
+    // sanity: without enforcement these tampered rules would NOT escalate the infant-fever case
+    const tamperedVerdict = decide(
+      evaluateRedFlags(infantFever, tamperedSigned.redFlagRules),
+      risk({ pRoutine: 0.99, confidence: 0.99 }),
+      tamperedSigned,
+    );
+    expect(tamperedVerdict.action).not.toBe('BLOCK_AND_HUMAN_HANDOFF');
+
+    const trace = adjudicate({
+      evidence: infantFever,
+      riskEstimate: risk({ pRoutine: 0.99, confidence: 0.99 }),
+      bundle: tamperedSigned,
+    });
+    expect(trace.decision.action).toBe('BLOCK_AND_HUMAN_HANDOFF');
+    expect(trace.bundle.signatureValid).toBe(false);
+    expect(trace.decision.decisionReason).toMatch(/signature invalid/i);
+    expect(trace.decision.requiresHumanReview).toBe(true);
+    expect(trace.workflowState).toBe('HUMAN_HANDOFF');
+    // the untrusted bundle's rules were NOT executed
+    expect(trace.redFlagResult.triggered).toBe(false);
+    expect(trace.redFlagResult.hits).toEqual([]);
+  });
+
+  it('(a2) a forged signature whose rules are intact still BLOCKs (claims-a-sig-that-fails → fail-closed)', () => {
+    vi.stubEnv('VOICE_CONFIG_HMAC_SECRET', SECRET);
+    const forged = {
+      ...DEFAULT_POLICY,
+      metadata: { ...DEFAULT_POLICY.metadata, signature: 'de'.repeat(32), signatureAlgorithm: 'hmac-sha256' as const },
+    };
+    const trace = adjudicate({ evidence: infantFever, riskEstimate: risk(), bundle: forged });
+    expect(trace.decision.action).toBe('BLOCK_AND_HUMAN_HANDOFF');
+    expect(trace.bundle.signatureValid).toBe(false);
+  });
+
+  it('(b) a validly-signed bundle adjudicates NORMALLY (infant fever still escalates to ED)', () => {
+    vi.stubEnv('VOICE_CONFIG_HMAC_SECRET', SECRET);
+    const trace = adjudicate({ evidence: infantFever, riskEstimate: risk(), bundle: signBundle(DEFAULT_POLICY, SECRET) });
+    expect(trace.bundle.signatureValid).toBe(true);
+    expect(trace.decision.action).toBe('ED_OR_911_GUIDANCE');
+    expect(trace.redFlagResult.triggered).toBe(true);
+    expect(trace.decision.ruleIdsApplied).toContain('infant-fever-floor');
+  });
+
+  it('(c) the UNSIGNED default bundle still adjudicates (signatureNone path is untouched)', () => {
+    vi.stubEnv('VOICE_CONFIG_HMAC_SECRET', SECRET);
+    const trace = adjudicate({ evidence: infantFever, riskEstimate: risk(), bundle: DEFAULT_POLICY });
+    // unsigned → not rejected; rules run and the infant-fever floor escalates as normal
+    expect(trace.decision.action).toBe('ED_OR_911_GUIDANCE');
+    expect(trace.bundle.signatureValid).toBe(false);
+    expect(trace.decision.decisionReason).not.toMatch(/signature invalid/i);
+  });
+
+  it('(c2) the UNSIGNED default with NO secret set still adjudicates (local/test default)', () => {
+    const trace = adjudicate({ evidence: infantFever, riskEstimate: risk(), bundle: DEFAULT_POLICY });
+    expect(trace.decision.action).toBe('ED_OR_911_GUIDANCE');
+    expect(trace.bundle.signatureValid).toBe(false);
+  });
+
+  it('(d) a checksum-mismatch (unsigned) bundle stays fail-closed via the inference gate', () => {
+    const tampered = { ...DEFAULT_POLICY, metadata: { ...DEFAULT_POLICY.metadata, checksum: 'deadbeef' } };
+    const trace = adjudicate({ evidence: infantFever, riskEstimate: risk(), bundle: tampered });
+    expect(trace.decision.action).toBe('BLOCK_AND_HUMAN_HANDOFF');
+    expect(trace.bundle.checksumValid).toBe(false);
+  });
+
+  it('an unsigned bundle that claims a signature but has no secret to verify it → fail-closed', () => {
+    // no VOICE_CONFIG_HMAC_SECRET set; bundle presents a signature the engine cannot verify
+    const claims = {
+      ...DEFAULT_POLICY,
+      metadata: { ...DEFAULT_POLICY.metadata, signature: 'ab'.repeat(32), signatureAlgorithm: 'hmac-sha256' as const },
+    };
+    const trace = adjudicate({ evidence: infantFever, riskEstimate: risk(), bundle: claims });
+    expect(trace.decision.action).toBe('BLOCK_AND_HUMAN_HANDOFF');
+    expect(trace.bundle.signatureValid).toBe(false);
+  });
+});

@@ -28,6 +28,12 @@ import { buildReferralBlock, type ReferralCitation, type ResourceLanguage } from
  * The ONLY dispositions that surface a referral — the two explicitly non-emergency actions. Defined
  * as an ALLOWLIST (not an emergency denylist) so a NEW action defaults to "no referral", failing
  * safe. SAME_DAY_REVIEW is deliberately excluded: it is time-sensitive, not a self-care endpoint.
+ *
+ * tk-0027 — the SDOH social-needs lane (engine/policy.ts) routes a PURE resource request
+ * (food / housing / transport) to SELF_CARE_INFO_ONLY, which is already in this allowlist — so a
+ * social need surfaces the community-resource referral (the food bank, demo beat 3) through this same
+ * path. The referral stays DECISION-INERT: it cites a resource, never the disposition, exactly as for
+ * a clinical self-care endpoint.
  */
 export const REFERRAL_ELIGIBLE_ACTIONS: ReadonlySet<AllowedAction> = new Set<AllowedAction>([
   'SELF_CARE_INFO_ONLY',

@@ -15,6 +15,8 @@ import {
   configureChannels,
   createAgent,
   publishAgent,
+  setAgentPolicyBundle,
+  updateAgentCustomization,
   TOGGLEABLE_CHANNELS,
   type ToggleableChannel,
 } from '@/lib/auth/agents';
@@ -66,6 +68,35 @@ export async function publishAgentAction(agentId: string, formData: FormData): P
   await configureChannels(prisma, { actorRole: session.user.role, agentId, channels });
   await publishAgent(prisma, { actorRole: session.user.role, agentId });
   revalidatePath('/console/agents');
+  revalidatePath(`/console/agents/${agentId}`);
+}
+
+/**
+ * Set the agent's signed policy bundle (tk-0017). The service is fail-closed on an unknown version,
+ * so a tampered form value can never become the safety contract. Re-derives the session server-side.
+ */
+export async function setPolicyBundleAction(agentId: string, formData: FormData): Promise<void> {
+  const session = await requireSession();
+  const policyBundleVersion = String(formData.get('policyBundleVersion') ?? '').trim();
+  await setAgentPolicyBundle(prisma, { actorRole: session.user.role, agentId, policyBundleVersion });
+  revalidatePath(`/console/agents/${agentId}`);
+}
+
+/**
+ * Save the agent's TONE/STYLE customization (tk-0015): persona, extra system-prompt text, and
+ * additional instructions. Re-derives the session + enforces the role gate. These fields tune the
+ * conversational VOICE only — the service appends them after the hard rules under a guardrail, and
+ * the deterministic engine still owns every disposition (they can never override it).
+ */
+export async function updateAgentCustomizationAction(agentId: string, formData: FormData): Promise<void> {
+  const session = await requireSession();
+  await updateAgentCustomization(prisma, {
+    actorRole: session.user.role,
+    agentId,
+    persona: String(formData.get('persona') ?? ''),
+    systemPromptExtra: String(formData.get('systemPromptExtra') ?? ''),
+    additionalInstructions: String(formData.get('additionalInstructions') ?? ''),
+  });
   revalidatePath(`/console/agents/${agentId}`);
 }
 

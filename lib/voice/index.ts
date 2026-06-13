@@ -7,6 +7,7 @@ export * from './types';
 export * from './config-signature';
 export * from './guidance';
 export * from './redact';
+export * from './routing';
 export {
   StandaloneVoiceGateway,
   getVoiceGateway,

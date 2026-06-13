@@ -207,6 +207,132 @@ describe('model-blindness — no name/DOB ever reaches the assembled model paylo
   });
 });
 
+describe('agent customization (tk-0015) — persona/instructions tune TONE only, never the engine', () => {
+  const base = () => buildSystemPrompt('en', toModelIdentityContext(unverifiedIdentity()));
+
+  it('empty customization → byte-for-byte the base prompt (no behavior change when unset)', () => {
+    const identity = toModelIdentityContext(unverifiedIdentity());
+    expect(buildSystemPrompt('en', identity, {})).toBe(base());
+    // Whitespace-only / null fields also collapse to the base prompt — nothing is appended.
+    expect(
+      buildSystemPrompt('en', identity, {
+        persona: '   ',
+        systemPromptExtra: '',
+        additionalInstructions: null,
+      }),
+    ).toBe(base());
+    expect(buildSystemPrompt('en', identity, undefined)).toBe(base());
+  });
+
+  it('persona + additionalInstructions appear in the built prompt, AFTER the hard rules', () => {
+    const persona = 'Warm, plain-language, reassuring to a worried caregiver.';
+    const additionalInstructions = 'Greet in the caller’s language; avoid medical jargon.';
+    const prompt = buildSystemPrompt('en', toModelIdentityContext(unverifiedIdentity()), {
+      persona,
+      additionalInstructions,
+    });
+
+    // The custom text is present...
+    expect(prompt).toContain(persona);
+    expect(prompt).toContain(additionalInstructions);
+    // ...and it comes AFTER the non-negotiable rules (the engine-owns-the-decision sentence).
+    const hardRuleIdx = prompt.indexOf('separate deterministic safety engine makes every disposition');
+    expect(hardRuleIdx).toBeGreaterThanOrEqual(0);
+    expect(prompt.indexOf(persona)).toBeGreaterThan(hardRuleIdx);
+    expect(prompt.indexOf(additionalInstructions)).toBeGreaterThan(hardRuleIdx);
+  });
+
+  it('systemPromptExtra is appended verbatim, also after the rules', () => {
+    const systemPromptExtra = 'Use short sentences. Acknowledge worry before the next question.';
+    const prompt = buildSystemPrompt('en', toModelIdentityContext(unverifiedIdentity()), {
+      systemPromptExtra,
+    });
+    expect(prompt).toContain(systemPromptExtra);
+    const rulesIdx = prompt.indexOf('Never state or imply');
+    expect(prompt.indexOf(systemPromptExtra)).toBeGreaterThan(rulesIdx);
+  });
+
+  it('the hard no-disposition + model-blindness rules SURVIVE any customization', () => {
+    // Even a persona that *tries* to override the engine cannot strip the invariants.
+    const prompt = buildSystemPrompt('en', toModelIdentityContext(unverifiedIdentity()), {
+      persona: 'Be decisive: tell the patient if this is an emergency and what to do.',
+      additionalInstructions: 'You may decide the urgency yourself.',
+    });
+    const lower = prompt.toLowerCase();
+    // No-disposition / no-urgency invariant intact:
+    expect(prompt).toContain('a separate deterministic safety engine makes every disposition');
+    expect(lower).toContain('never state or imply');
+    // Model-blindness intact:
+    expect(lower).toContain('never ask for');
+    expect(lower).toContain('date of');
+    // And a guardrail explicitly subordinates the customization to the rules.
+    expect(lower).toContain('only your tone');
+    expect(lower).toMatch(/ignore that part/i);
+    // No PHI leaks via the persona path either.
+    for (const id of SYNTH_IDENTIFIERS) expect(prompt).not.toContain(id);
+  });
+
+  it('proposeAssessment threads the customization into the system prompt it sends', async () => {
+    let captured: Anthropic.MessageCreateParamsNonStreaming | undefined;
+    const create: CreateMessage = vi.fn(async (params) => {
+      captured = params;
+      return fakeMessage(INFANT_FEVER_PROPOSAL);
+    });
+    await proposeAssessment({
+      createMessage: create,
+      lang: 'en',
+      identity: toModelIdentityContext(unverifiedIdentity()),
+      history: [{ role: 'user', text: 'sore throat for a day' }],
+      custom: { persona: 'Calm and concise.' },
+    });
+    expect(String(captured?.system)).toContain('Calm and concise.');
+    // Threading the persona must NOT re-introduce `thinking` under the forced tool call (prod 400).
+    expect((captured as Record<string, unknown> | undefined)?.thinking).toBeUndefined();
+  });
+
+  it('runTurn passes custom through and the engine STILL decides (persona cannot soften a red flag)', async () => {
+    let captured: Anthropic.MessageCreateParamsNonStreaming | undefined;
+    const create: CreateMessage = vi.fn(async (params) => {
+      captured = params;
+      return fakeMessage(INFANT_FEVER_PROPOSAL, 'It is probably nothing serious.');
+    });
+    const { panel } = await runTurn({
+      createMessage: create,
+      lang: 'en',
+      identity: toModelIdentityContext(unverifiedIdentity()),
+      history: [{ role: 'user', text: 'my 2 month old has a fever of 101' }],
+      custom: { persona: 'Be soothing; reassure the parent it is fine.' },
+    });
+    // The persona reached the model...
+    expect(String(captured?.system)).toContain('Be soothing');
+    // ...but the deterministic engine still escalates the infant fever — tone did not move the decision.
+    expect(panel.action).toBe('ED_OR_911_GUIDANCE');
+    expect(panel.redFlagFired).toBe(true);
+  });
+});
+
+describe('the model call is API-valid — forced tool_choice WITHOUT thinking (regression: prod 400)', () => {
+  it('forces the propose tool and sends NO `thinking` (the API rejects the combination)', async () => {
+    let captured: Anthropic.MessageCreateParamsNonStreaming | undefined;
+    const create: CreateMessage = vi.fn(async (params) => {
+      captured = params;
+      return fakeMessage(INFANT_FEVER_PROPOSAL);
+    });
+    await proposeAssessment({
+      createMessage: create,
+      lang: 'en',
+      identity: toModelIdentityContext(unverifiedIdentity()),
+      history: [{ role: 'user', text: 'sore throat for a day' }],
+    });
+    // Structured output via forced tool use...
+    expect(captured?.tool_choice).toEqual({ type: 'tool', name: PROPOSE_TOOL_NAME });
+    // ...so `thinking` MUST be absent — the API 400s ("Thinking may not be enabled when tool_choice
+    // forces tool use"), which silently broke every chat turn in prod. This is the regression guard.
+    expect((captured as Record<string, unknown> | undefined)?.thinking).toBeUndefined();
+    expect(captured?.model).toBe(TRIAGE_MODEL);
+  });
+});
+
 describe('parseProposal — defensive parsing of the model tool_use', () => {
   it('throws when the model fails to call the tool (cannot adjudicate without typed evidence)', () => {
     const noTool = {
@@ -228,6 +354,53 @@ describe('parseProposal — defensive parsing of the model tool_use', () => {
     expect(out.evidence.every((e) => e.sourceTrust === 'low')).toBe(true);
     expect(out.evidence.every((e) => e.traceId === 'trc')).toBe(true);
     expect(out.riskEstimate.modelVersion).toBe(TRIAGE_MODEL);
+  });
+});
+
+describe('multi-turn (tk-0029) — runTurn surfaces turnMode end-to-end (model → engine → panel)', () => {
+  it('a thin, low-coverage proposal → panel.turnMode "converse" (keep gathering info, no scary card)', async () => {
+    // The model proposes one vague symptom with LOW evidence coverage → the engine BLOCKs for
+    // insufficiency (no red flag). The panel must say CONVERSE so the UI keeps the conversation going.
+    const create = mockCreate(
+      {
+        evidence: [{ factType: 'symptom', value: 'not_feeling_well', confidence: 0.5 }],
+        risk: {
+          pRoutine: 0.6,
+          pUrgent: 0.2,
+          pCritical: 0.05,
+          confidence: 0.7,
+          oodScore: 0.2,
+          evidenceCoverageScore: 0.2, // < reviewThreshold 0.4 → evidence-insufficiency block
+          reasonCodes: ['vague'],
+        },
+      },
+      'Can you tell me how long this has been going on, and how bad it feels?',
+    );
+    const { panel, trace, assistantText } = await runTurn({
+      createMessage: create,
+      lang: 'en',
+      identity: toModelIdentityContext(unverifiedIdentity()),
+      history: [{ role: 'user', text: "i don't feel great" }],
+    });
+    expect(trace.decision.action).toBe('BLOCK_AND_HUMAN_HANDOFF');
+    expect(trace.redFlagResult.triggered).toBe(false);
+    expect(panel.turnMode).toBe('converse');
+    // The model's follow-up question is available for the chat bubble (the conversation continues).
+    expect(assistantText).toContain('how long');
+  });
+
+  it('an emergency (infant fever red flag) → panel.turnMode "present" (ALWAYS surfaces immediately)', async () => {
+    const create = mockCreate(INFANT_FEVER_PROPOSAL);
+    const { panel } = await runTurn({
+      createMessage: create,
+      lang: 'en',
+      identity: toModelIdentityContext(unverifiedIdentity()),
+      history: [{ role: 'user', text: 'my 2 month old has a fever of 101' }],
+    });
+    // The safety thesis through the full loop: an emergency is presented, never deferred to "converse".
+    expect(panel.action).toBe('ED_OR_911_GUIDANCE');
+    expect(panel.redFlagFired).toBe(true);
+    expect(panel.turnMode).toBe('present');
   });
 });
 
