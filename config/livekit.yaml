@@ -1,12 +1,35 @@
-# LiveKit server — LOCAL DEV config only. Lane G (T13) provides the standalone EC2 config
-# (nat_1_to_1_ip = EC2 EIP, real keys via .env). These dev keys are NOT secrets.
+# LiveKit server config — works for BOTH local compose AND the standalone EC2 (T13).
+#
+# Local compose: use_external_ip:false, no NAT mapping (containers share the host network namespace
+#   via bound ports). The dev key below is NOT a secret.
+# Standalone EC2: set rtc.nat_1_to_1_ip to the EC2 ELASTIC IP so RTP/ICE advertises the public
+#   address (a single-VM box behind 1:1 NAT). This is THE quirk that makes media flow. Either
+#   substitute it via the env var below at boot, or hard-set it in the box's copy of this file.
+#
+# Keys are env-driven on the standalone box (LIVEKIT_KEYS="<api_key>: <api_secret>"); the devkey
+# is a local-only placeholder (min 32 chars) so compose comes up without real keys.
 port: 7880
 bind_addresses:
   - "0.0.0.0"
+
 rtc:
   tcp_port: 7881
   port_range_start: 50000
   port_range_end: 50100
+  # Local: false. EC2: leave false and set nat_1_to_1_ip to the EIP (below) — do NOT use both.
   use_external_ip: false
+  # STANDALONE EC2 ONLY — the Elastic IP for 1:1 NAT. Env-substituted at boot; empty = unset (local).
+  # e.g. export LIVEKIT_NAT_1_TO_1_IP=<EC2 EIP>  →  nat_1_to_1_ip: <EC2 EIP>
+  nat_1_to_1_ip: ${LIVEKIT_NAT_1_TO_1_IP}
+
+# Keys: env-driven on the box. LIVEKIT_KEYS="APIxxxx: <secret>" overrides the dev placeholder.
 keys:
   devkey: lk_local_dev_only_min_32_chars_000000000
+
+# Redis lets the server + the SIP service share state. The compose stack ships a `redis` service,
+# and the standalone EC2 runs that SAME compose, so this literal works in both places.
+redis:
+  address: redis:6379
+
+logging:
+  level: info

@@ -69,6 +69,12 @@ services:
     command: ["--config", "/etc/livekit.yaml"]
     volumes:
       - ./config/livekit.yaml:/etc/livekit.yaml:ro
+    environment:
+      # Config substitutes ${...}. Local: NAT empty (= no 1:1 NAT, correct for compose). On the
+      # standalone EC2, set LIVEKIT_NAT_1_TO_1_IP to the Elastic IP (the media address quirk).
+      LIVEKIT_NAT_1_TO_1_IP: ${LIVEKIT_NAT_1_TO_1_IP:-}
+    depends_on:
+      - redis
     ports:
       - "7880:7880"
       - "7881:7881"
@@ -79,6 +85,11 @@ services:
     command: ["--config", "/etc/sip.yaml"]
     volumes:
       - ./config/sip.yaml:/etc/sip.yaml:ro
+    environment:
+      # SIP keys must match the LiveKit server keys. Local: the dev placeholder; on the box, the
+      # real keys come from .env. (These are NOT secrets in local dev.)
+      SIP_API_KEY: ${SIP_API_KEY:-devkey}
+      SIP_API_SECRET: ${SIP_API_SECRET:-lk_local_dev_only_min_32_chars_000000000}
     depends_on:
       - livekit
       - redis
@@ -96,8 +107,14 @@ services:
       LIVEKIT_URL: ws://livekit:7880
       LIVEKIT_API_KEY: devkey
       LIVEKIT_API_SECRET: lk_local_dev_only_min_32_chars_000000000
+      # The worker calls the app's no-PHI policy endpoints (model PROPOSES, engine DECIDES) and
+      # authenticates with an HMAC bearer token. VOICE_CONFIG_HMAC_SECRET comes from .env.
+      VOICE_APP_BASE_URL: http://app:3000
+      VOICE_AGENT_NAME: ${VOICE_AGENT_NAME:-cara-spark-cascade}
+      VOICE_ROOM_PREFIX: ${VOICE_ROOM_PREFIX:-voicephone-}
     depends_on:
       - livekit
+      - app
     restart: unless-stopped
 
 volumes:

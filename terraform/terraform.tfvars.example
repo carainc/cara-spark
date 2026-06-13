@@ -1,0 +1,10 @@
+# Copy to terraform.tfvars and adjust. (terraform.tfvars is gitignored; *.tfvars.example is tracked.)
+region        = "us-east-1"
+instance_type = "t3.large"
+# key_name    = "my-ec2-keypair"   # optional, for SSH debugging
+# ssh_cidr    = "1.2.3.4/32"        # optional, tighten SSH access
+
+# Voice firewall — IP-allowlist auth (the box's only firewall layer). Defaults are Telnyx US ranges.
+# Replace with YOUR carrier's signaling/media CIDRs. Do NOT open SIP to 0.0.0.0/0.
+# sip_signaling_cidrs = ["192.76.120.0/24", "64.16.250.0/24"]
+# rtp_media_cidrs     = ["192.76.120.0/24", "64.16.250.0/24"]
