@@ -69,16 +69,31 @@ services:
     command: ["--config", "/etc/livekit.yaml"]
     volumes:
       - ./config/livekit.yaml:/etc/livekit.yaml:ro
-    environment:
-      # Config substitutes ${...}. Local: NAT empty (= no 1:1 NAT, correct for compose). On the
-      # standalone EC2, set LIVEKIT_NAT_1_TO_1_IP to the Elastic IP (the media address quirk).
-      LIVEKIT_NAT_1_TO_1_IP: ${LIVEKIT_NAT_1_TO_1_IP:-}
+    # IMPORTANT: livekit-server does NOT expand ${...} inside the mounted YAML — it yaml.Unmarshals
+    # the file as-is (os.ExpandEnv is applied only to key_file). Anything dynamic is set via the env
+    # vars the server actually recognizes, supplied through .env (NOT as hard-coded empty defaults —
+    # an EMPTY-but-present NODE_IP / LIVEKIT_KEYS counts as "set" to the server's CLI parser and would
+    # wipe the file's keys / corrupt IP discovery, crashing the server). Absent locally → the YAML's
+    # devkey + automatic IP are used; set on the box via .env:
+    #   • NODE_IP=<EC2 Elastic IP>           — advertised RTC/ICE address (the 1:1-NAT media quirk;
+    #     replaces the old, never-expanded nat_1_to_1_ip). On the box: NODE_IP=$LIVEKIT_NAT_1_TO_1_IP.
+    #   • LIVEKIT_KEYS="<api_key>: <secret>" — overrides the YAML devkey.
+    env_file:
+      - .env
     depends_on:
       - redis
     ports:
       - "7880:7880"
       - "7881:7881"
       - "50000-50100:50000-50100/udp"
+    healthcheck:
+      # /rtc/validate is the server's lightweight liveness endpoint; if the config fails to parse the
+      # process exits and this never goes healthy (so the failure is visible, not a silent absence).
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:7880/ >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
 
   livekit-sip:
     image: livekit/sip:latest
@@ -86,13 +101,17 @@ services:
     volumes:
       - ./config/sip.yaml:/etc/sip.yaml:ro
     environment:
-      # SIP keys must match the LiveKit server keys. Local: the dev placeholder; on the box, the
-      # real keys come from .env. (These are NOT secrets in local dev.)
-      SIP_API_KEY: ${SIP_API_KEY:-devkey}
-      SIP_API_SECRET: ${SIP_API_SECRET:-lk_local_dev_only_min_32_chars_000000000}
+      # SIP keys must match the LiveKit server keys. The SIP binary reads its credentials from
+      # LIVEKIT_API_KEY / LIVEKIT_API_SECRET (NOT from sip.yaml, which omits them — see config/sip.yaml).
+      # Local: the dev placeholder (matches config/livekit.yaml's devkey); on the box, the real keys
+      # come from .env (SIP_API_KEY / SIP_API_SECRET must equal the LIVEKIT_KEYS pair). NOT secrets locally.
+      LIVEKIT_API_KEY: ${SIP_API_KEY:-devkey}
+      LIVEKIT_API_SECRET: ${SIP_API_SECRET:-lk_local_dev_only_min_32_chars_000000000}
     depends_on:
-      - livekit
-      - redis
+      livekit:
+        condition: service_healthy
+      redis:
+        condition: service_started
     ports:
       - "5060:5060/udp"
       - "10000-10100:10000-10100/udp"
@@ -113,8 +132,12 @@ services:
       VOICE_AGENT_NAME: ${VOICE_AGENT_NAME:-cara-spark-cascade}
       VOICE_ROOM_PREFIX: ${VOICE_ROOM_PREFIX:-voicephone-}
     depends_on:
-      - livekit
-      - app
+      # Wait for LiveKit to be HEALTHY (not merely started) so the worker doesn't crash-connect to
+      # ws://livekit:7880 before the server has parsed its config and bound the port.
+      livekit:
+        condition: service_healthy
+      app:
+        condition: service_started
     restart: unless-stopped
 
 volumes:

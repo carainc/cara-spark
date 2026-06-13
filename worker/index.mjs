@@ -142,6 +142,24 @@ export function isTerminal(action) {
   );
 }
 
+// The @livekit/agents subcommands cli.runApp() understands (commander). With NONE present it prints
+// --help and exits — the crash-loop this worker hit when launched as `node worker/index.mjs`.
+export const AGENTS_CLI_SUBCOMMANDS = ['start', 'dev', 'connect', 'download-files'];
+
+/**
+ * Return an argv that is guaranteed to carry an @livekit/agents subcommand, defaulting to production
+ * `start` when none was passed. Pure (does not mutate input) so it can be unit-tested; main() applies
+ * the result to process.argv before cli.runApp(). An explicit subcommand (dev/connect/...) is kept.
+ * argv shape mirrors process.argv: [exec, script, maybeSubcommand, ...rest].
+ */
+export function ensureStartSubcommand(argv) {
+  const a = Array.isArray(argv) ? argv.slice() : [];
+  if (!AGENTS_CLI_SUBCOMMANDS.includes(a[2])) {
+    a.splice(2, 0, 'start');
+  }
+  return a;
+}
+
 function safeJson(s) {
   try {
     return JSON.parse(s) || {};
@@ -313,21 +331,25 @@ function clamp01(n, fallback = 0) {
  * Pull the caller's most recent spoken text out of a LiveKit ChatContext. This is the ONLY thing the
  * brain ever sees — the words the caller chose to say. We never add a name/DOB to model context.
  *
- * TODO(livekit-api): confirm the exact ChatContext accessor in this version. v1.x overhauled
- * ChatContext; the items are commonly on `chatCtx.items` with `role` and a `content`/`textContent`.
- * We defensively read the last user item's text and fall back to '' so a shape change degrades to
- * "no transcript" (a cautious engine disposition) rather than throwing.
+ * Verified against @livekit/agents v1.x (llm/chat_context): `ChatContext.items: ChatItem[]`, where a
+ * ChatItem may be a `ChatMessage` (`readonly role: 'developer'|'system'|'user'|'assistant'`,
+ * `content: ChatContent[]`, and a `get textContent(): string | undefined` convenience getter) or a
+ * non-message item (FunctionCall/Output/handoff) that has no `role`. We read the last *user* message's
+ * text via `textContent` first, then fall back to walking `content` (each entry is `string` or a block
+ * with a `.text`). Non-user items and non-message items are skipped. Any shape surprise degrades to ''
+ * (→ "no transcript", a cautious engine disposition) rather than throwing.
  */
 export function latestUserText(chatCtx) {
   try {
     const items = chatCtx?.items || chatCtx?.messages || [];
     for (let i = items.length - 1; i >= 0; i--) {
       const it = items[i];
-      if (it?.role && it.role !== 'user') continue;
+      // Only ChatMessages carry a role; only user turns are the caller's own words.
+      if (!it || it.role !== 'user') continue;
       const text =
-        (typeof it?.textContent === 'string' && it.textContent) ||
-        (typeof it?.content === 'string' && it.content) ||
-        (Array.isArray(it?.content)
+        (typeof it.textContent === 'string' && it.textContent) ||
+        (typeof it.content === 'string' && it.content) ||
+        (Array.isArray(it.content)
           ? it.content
               .map((c) => (typeof c === 'string' ? c : c?.text || ''))
               .join(' ')
@@ -396,13 +418,14 @@ function buildAgent(sdks) {
     }
 
     /**
-     * Engine-gated turn. Verified signature (LiveKit Agents v1.x, Node):
-     *   async llmNode(chatCtx, toolCtx, modelSettings): Promise<ReadableStream<ChatChunk|string>|null>
+     * Engine-gated turn. Verified signature (@livekit/agents v1.x, voice/agent.d.ts):
+     *   llmNode(chatCtx: ChatContext, toolCtx: ToolContext, modelSettings: ModelSettings):
+     *     Promise<ReadableStream<ChatChunk | string | FlushSentinel> | null>
      * We do NOT call the default LLM node. Instead, on each turn we:
      *   1. take the caller's latest spoken text from chatCtx (NO PHI is added by us),
      *   2. have Opus 4.8 PROPOSE typed evidence + risk (proposeEvidence),
      *   3. call /api/voice/decide so the DETERMINISTIC ENGINE picks the action + verbatim guidance,
-     *   4. stream back ONLY that guidance text — the model never authors the spoken line.
+     *   4. stream back ONLY that guidance — as a single ChatChunk — so the model never authors the line.
      */
     async llmNode(chatCtx, _toolCtx, _modelSettings) {
       // Once a terminal escalation has fired, the model is latched out: keep repeating the safe line.
@@ -430,15 +453,19 @@ function buildAgent(sdks) {
       this.lastAction = decision.action;
       this.lastTrace = decision.trace ?? null;
 
-      // Stream a single chunk of the engine-authored guidance. The session speaks it via TTS.
-      // TODO(livekit-api): confirm the exact ChatChunk shape this version expects. A plain string
-      // chunk is accepted per the documented `ReadableStream<ChatChunk | string>` return type; if a
-      // future version requires a structured delta, wrap `guidance` accordingly (do NOT let the model
-      // author the text — always emit `decision.guidance` verbatim).
+      // Stream a single chunk of the engine-authored guidance. The session forwards `delta.content`
+      // into the TTS node. Verified ChatChunk shape (@livekit/agents v1.x, llm/llm.d.ts):
+      //   { id: string; delta?: { role: ChatRole; content?: string; ... }; usage?: ... }
+      // We emit ONE assistant chunk carrying the verbatim guidance — the model never authors this text
+      // (it only ever proposes evidence above). A FlushSentinel/end is implied by closing the stream.
       const guidance = decision.guidance || failClosedGuidance(this.language);
+      const chunk = {
+        id: traceId,
+        delta: { role: 'assistant', content: guidance },
+      };
       return new ReadableStream({
         start(controller) {
-          controller.enqueue(guidance);
+          controller.enqueue(chunk);
           controller.close();
         },
       });
@@ -459,9 +486,15 @@ function buildAgent(sdks) {
 
     entry: async (ctx) => {
       // EXPLICIT dispatch already routed this room to us by name. Additionally guard on the room-name
-      // prefix so a stray room can never be answered by this worker.
+      // prefix so a stray room can never be answered by this worker. (ctx.room is populated before
+      // connect — JobContext exposes the assigned room from the job request.)
       const roomName = ctx.room?.name || '';
       if (!roomName.startsWith(CFG.roomPrefix)) return;
+
+      // Join the room. Verified API (@livekit/agents v1.x, JobContext.connect): the entrypoint MUST
+      // call ctx.connect() before the AgentSession can publish/subscribe audio — without it there is
+      // no media path and the SIP caller hears nothing.
+      await ctx.connect();
 
       // The call language + the opaque agent ref ride on the dispatch attributes / room metadata
       // (no PHI). Default to English when unset.
@@ -505,14 +538,12 @@ function buildAgent(sdks) {
           /* post-call is best-effort; the live call is already complete */
         }
       };
-      // TODO(livekit-api): confirm the room/session close event name in this version (candidates:
-      // 'disconnected' on ctx.room, or a 'close' on the session). The engine gate in llmNode is the
-      // source of truth regardless — this listener only flushes the post-call summary.
-      try {
-        ctx.room?.on?.('disconnected', onClose);
-      } catch {
-        /* optional */
-      }
+      // Flush the post-call summary when the job ends. Verified API (@livekit/agents v1.x,
+      // JobContext.addShutdownCallback): callbacks registered here are awaited when the room/job shuts
+      // down (caller hangs up, room deleted, worker drain) — the agents-native lifecycle hook, which is
+      // version-stable (vs. guessing an rtc-node RoomEvent name). The engine gate in llmNode remains the
+      // source of truth for the disposition; this only persists the final result + provable trace.
+      ctx.addShutdownCallback(onClose);
 
       await session.start({ agent, room: ctx.room });
     },
@@ -550,6 +581,20 @@ async function main() {
   }
 
   const { cli, WorkerOptions } = _SDKS.agents;
+
+  // cli.runApp builds a commander CLI and calls program.parse(process.argv). Its subcommands are
+  // `start` (production), `dev`, `connect`, and `download-files`; with NO subcommand the default
+  // action prints `--help` and EXITS (it checks `process.argv.length < 3`). That is exactly the
+  // observed crash-loop: the container CMD launched `node worker/index.mjs` with no subcommand, so the
+  // worker logged its boot line, dumped the Agents CLI usage, and exited.
+  //
+  // Default to production `start` when the operator passed no subcommand, so a bare
+  // `node worker/index.mjs` (and the container CMD) boots and stays registered. An explicit
+  // subcommand (dev/connect/download-files) is always honored. We rewrite argv BEFORE runApp so
+  // commander sees it. This only runs in the top-level worker process — job subprocesses are launched
+  // by the framework via ipc/job_proc_lazy_main (our module is dynamically imported as the `agent`,
+  // never re-run as argv[1]), so this never perturbs a child's argv.
+  process.argv = ensureStartSubcommand(process.argv);
 
   // Register the worker under VOICE_AGENT_NAME so EXPLICIT dispatch (room_config.agents=[name]) routes
   // calls here, and ONLY here (a non-empty agentName disables automatic dispatch). cli.runApp owns

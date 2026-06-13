@@ -26,4 +26,8 @@ RUN npm install --omit=dev --no-audit --no-fund
 COPY worker/ ./worker/
 
 # Long-lived worker process. It registers with LiveKit and waits for explicitly-dispatched rooms.
-CMD ["node", "worker/index.mjs"]
+# The `start` subcommand is REQUIRED: @livekit/agents' cli.runApp() is a commander CLI whose
+# subcommands are start|dev|connect|download-files; with NO subcommand it prints --help and exits
+# (the crash-loop this image previously hit). `start` runs the worker in production mode. (index.mjs
+# also defaults argv to `start` if omitted, so this is explicit-and-belt-and-suspenders.)
+CMD ["node", "worker/index.mjs", "start"]
