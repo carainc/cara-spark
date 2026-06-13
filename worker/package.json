@@ -1,0 +1,17 @@
+{
+  "name": "cara-spark-agent-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cara Spark standalone LiveKit voice worker — Deepgram STT -> Opus 4.8 (engine-gated) -> Deepgram Aura TTS. Built into worker.Dockerfile only; NOT part of the Next app's dependency tree.",
+  "main": "index.mjs",
+  "scripts": {
+    "start": "node index.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.1",
+    "@livekit/agents": "^1.0.0",
+    "@livekit/agents-plugin-deepgram": "^1.0.0",
+    "@livekit/agents-plugin-silero": "^1.0.0"
+  }
+}
