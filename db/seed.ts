@@ -10,6 +10,7 @@ import bcrypt from 'bcryptjs';
 import { seedSuperAdmin } from '../lib/auth/seed';
 import { demoPhoneDid } from '../lib/auth/bundle';
 import { TRIAGE_DEMO_PERSONA, TRIAGE_DEMO_ADDITIONAL_INSTRUCTIONS } from './triage-demo-persona';
+import { ingestResource, createOpenAIEmbedder, isEmbeddingConfigured, pgStore } from '../lib/rag';
 
 const prisma = new PrismaClient();
 
@@ -92,26 +93,34 @@ async function main() {
     });
   }
 
-  // Sample referral resources (EN + ES). Embeddings are computed later (T12).
+  // Sample referral resources (EN + ES). Embed them via the real RAG ingest path (assertNoPhi →
+  // chunk → embed → store) when an embedding key is configured, so the food-bank referral actually
+  // RETRIEVES in the demo. Without a key, store plain (retrieval simply stays disabled). T12.
   await prisma.referralResource.deleteMany({ where: { tenantId: tenant.id } });
-  await prisma.referralResource.createMany({
-    data: [
-      {
-        tenantId: tenant.id,
-        title: 'Community Food Bank',
-        body: 'Free groceries Mon–Sat, 9am–5pm. 123 Main St. No ID or appointment required.',
-        category: 'food_bank',
-        language: 'EN',
-      },
-      {
-        tenantId: tenant.id,
-        title: 'Banco de Alimentos Comunitario',
-        body: 'Comida gratis de lunes a sábado, 9am–5pm. Calle Main 123. No se requiere identificación ni cita.',
-        category: 'food_bank',
-        language: 'ES',
-      },
-    ],
-  });
+  const referralSeeds = [
+    {
+      title: 'Community Food Bank',
+      body: 'Free groceries Mon–Sat, 9am–5pm. 123 Main St. No ID or appointment required. Fresh produce, canned goods, and bread. Walk-ins welcome; emergency food boxes available.',
+      category: 'food_bank',
+      language: 'EN' as const,
+    },
+    {
+      title: 'Banco de Alimentos Comunitario',
+      body: 'Comida gratis de lunes a sábado, 9am–5pm. Calle Main 123. No se requiere identificación ni cita. Productos frescos, alimentos enlatados y pan. Cajas de comida de emergencia disponibles.',
+      category: 'food_bank',
+      language: 'ES' as const,
+    },
+  ];
+  if (isEmbeddingConfigured()) {
+    const ragDeps = { store: pgStore(prisma), embed: createOpenAIEmbedder() };
+    for (const r of referralSeeds) {
+      await ingestResource({ tenantId: tenant.id, ...r }, ragDeps);
+    }
+  } else {
+    await prisma.referralResource.createMany({
+      data: referralSeeds.map((r) => ({ tenantId: tenant.id, ...r })),
+    });
+  }
 
   console.log(
     `Seeded: tenant=${tenant.slug}, super-admin=${superAdmin.email} (count=${superAdminCount}), ` +
