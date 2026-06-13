@@ -125,5 +125,11 @@ export const es: Dict = {
       cannotSoften: 'El modelo no puede suavizar ni anular una bandera roja activada.',
       escalationLocked: 'Escalada de emergencia — bloqueada por el motor.',
     },
+    // Referencia informativa (demo beat 3 / tk-0019) — se agrega SOLO tras una disposición no urgente.
+    // No modifica la decisión: estos recursos nunca cambian la recomendación clínica.
+    referral: {
+      title: 'Recursos comunitarios que podrían ser útiles',
+      decisionInert: 'Informativo · no cambian la recomendación clínica',
+    },
   },
 };
