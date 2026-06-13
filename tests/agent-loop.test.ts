@@ -357,6 +357,53 @@ describe('parseProposal — defensive parsing of the model tool_use', () => {
   });
 });
 
+describe('multi-turn (tk-0029) — runTurn surfaces turnMode end-to-end (model → engine → panel)', () => {
+  it('a thin, low-coverage proposal → panel.turnMode "converse" (keep gathering info, no scary card)', async () => {
+    // The model proposes one vague symptom with LOW evidence coverage → the engine BLOCKs for
+    // insufficiency (no red flag). The panel must say CONVERSE so the UI keeps the conversation going.
+    const create = mockCreate(
+      {
+        evidence: [{ factType: 'symptom', value: 'not_feeling_well', confidence: 0.5 }],
+        risk: {
+          pRoutine: 0.6,
+          pUrgent: 0.2,
+          pCritical: 0.05,
+          confidence: 0.7,
+          oodScore: 0.2,
+          evidenceCoverageScore: 0.2, // < reviewThreshold 0.4 → evidence-insufficiency block
+          reasonCodes: ['vague'],
+        },
+      },
+      'Can you tell me how long this has been going on, and how bad it feels?',
+    );
+    const { panel, trace, assistantText } = await runTurn({
+      createMessage: create,
+      lang: 'en',
+      identity: toModelIdentityContext(unverifiedIdentity()),
+      history: [{ role: 'user', text: "i don't feel great" }],
+    });
+    expect(trace.decision.action).toBe('BLOCK_AND_HUMAN_HANDOFF');
+    expect(trace.redFlagResult.triggered).toBe(false);
+    expect(panel.turnMode).toBe('converse');
+    // The model's follow-up question is available for the chat bubble (the conversation continues).
+    expect(assistantText).toContain('how long');
+  });
+
+  it('an emergency (infant fever red flag) → panel.turnMode "present" (ALWAYS surfaces immediately)', async () => {
+    const create = mockCreate(INFANT_FEVER_PROPOSAL);
+    const { panel } = await runTurn({
+      createMessage: create,
+      lang: 'en',
+      identity: toModelIdentityContext(unverifiedIdentity()),
+      history: [{ role: 'user', text: 'my 2 month old has a fever of 101' }],
+    });
+    // The safety thesis through the full loop: an emergency is presented, never deferred to "converse".
+    expect(panel.action).toBe('ED_OR_911_GUIDANCE');
+    expect(panel.redFlagFired).toBe(true);
+    expect(panel.turnMode).toBe('present');
+  });
+});
+
 describe('a benign case flows to a non-escalation action', () => {
   it('common-cold-shaped proposal → SELF_CARE_INFO_ONLY (engine, not model, decides)', async () => {
     const create = mockCreate({

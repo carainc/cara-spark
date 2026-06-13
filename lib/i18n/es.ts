@@ -207,6 +207,16 @@ export const es: Dict = {
     agentLabel: 'Cara Spark',
     restart: 'Empezar de nuevo',
     errorGeneric: 'Algo salió mal al revisar eso. Inténtelo de nuevo o llame a su clínica. Si es una emergencia, llame al 911.',
+    // Se muestra mientras la conversación aún recopila información (el motor TODAVÍA no ha llegado a un
+    // próximo paso seguro y confiable). La pregunta de seguimiento del modelo aparece como un mensaje
+    // arriba; esta línea invita amablemente a la siguiente respuesta. NO es una tarjeta de "esto
+    // necesita una persona" — eso se reserva para un bloqueo de seguridad real / bandera roja, que
+    // siempre se muestra de inmediato.
+    continuePrompt: 'Cuénteme un poco más para indicarle el próximo paso más seguro.',
+    // El control de razonamiento, solo para operadores y colapsado por defecto. La traza verificable
+    // vive detrás de esto en el chat del paciente; la vista previa del operador la muestra expandida.
+    showReasoning: 'Mostrar razonamiento (depuración)',
+    showReasoningHint: 'Vista de operador — la traza de decisión verificable del motor.',
     socialNeedGuidance:
       'Parece que está buscando apoyo comunitario más que atención médica — aquí hay algunos recursos locales que podrían ayudar. Si algo en su salud cambia, puede iniciar una nueva consulta en cualquier momento.',
     guidance: {

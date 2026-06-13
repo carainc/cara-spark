@@ -211,6 +211,15 @@ export const en = {
     agentLabel: 'Cara Spark',
     restart: 'Start over',
     errorGeneric: 'Something went wrong reviewing that. Please try again, or call your clinic. If this is an emergency, call 911.',
+    // Shown while the conversation is still gathering information (the engine has NOT yet reached a
+    // confident, safe next step). The model's follow-up question appears as a chat bubble above; this
+    // line gently invites the next reply. NOT a "this needs a person" card — that is reserved for a
+    // genuine safety block / red flag, which always presents immediately.
+    continuePrompt: 'Tell me a bit more so I can point you to the safest next step.',
+    // The collapsed, operator-only reasoning toggle. The provable trace lives behind this in the
+    // patient chat (collapsed by default); the operator preview shows it expanded.
+    showReasoning: 'Show reasoning (debug)',
+    showReasoningHint: 'Operator view — the engine’s provable decision trace.',
     // Shown when the deterministic engine routes a PURE social/resource (SDOH) request — never the
     // clinical self-care text. The community-resource referral (e.g. a food bank) is appended below it.
     socialNeedGuidance:
