@@ -61,74 +61,78 @@ export function Chat({ agentId, lang }: { agentId?: string; lang: Lang }) {
   }
 
   return (
-    <div data-testid="agent-chat" className="space-y-4">
-      <p className="text-sm text-gray-600">{t.intro}</p>
+    <div data-testid="agent-chat" className="space-y-5">
+      <p className="rounded-card border border-ink-line bg-paper-sunken px-4 py-3 text-stamp text-ink-700">{t.intro}</p>
 
       {/* conversation */}
-      <ol className="space-y-2">
+      <ol className="space-y-2.5">
         {state.history.map((turn, i) => (
           <li
             key={i}
             data-testid={`chat-${turn.role}`}
-            className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
+            className={`max-w-[85%] rounded-card px-4 py-2.5 ${
               turn.role === 'user'
-                ? 'ml-auto bg-brand/10 text-gray-900'
-                : 'mr-auto bg-gray-100 text-gray-800'
+                ? 'ml-auto rounded-br-sm bg-brand-50 text-ink-900'
+                : 'mr-auto rounded-bl-sm border border-ink-line bg-paper-raised text-ink-900'
             }`}
           >
-            <span className="block text-[10px] font-medium uppercase tracking-wide text-gray-400">
+            <span className="block text-[11px] font-semibold uppercase tracking-wide text-ink-300">
               {turn.role === 'user' ? t.youLabel : t.agentLabel}
             </span>
-            {turn.text}
+            <span className="text-body">{turn.text}</span>
           </li>
         ))}
         {pending && (
-          <li className="mr-auto rounded-2xl bg-gray-100 px-3 py-2 text-sm text-gray-500">{t.thinking}</li>
+          <li className="mr-auto flex items-center gap-2 rounded-card border border-ink-line bg-paper-raised px-4 py-2.5 text-ink-500">
+            <span aria-hidden className="flex gap-1">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand-400" />
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand-400 [animation-delay:150ms]" />
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand-400 [animation-delay:300ms]" />
+            </span>
+            {t.thinking}
+          </li>
         )}
       </ol>
 
       {/* the engine's binding guidance + provable trace */}
       {state.panel && (
-        <div className="space-y-3">
+        <div className="space-y-4">
           <div
             data-testid="guidance"
-            className={`rounded-lg border p-4 ${
-              state.panel.isEscalation ? 'border-crisis/40 bg-crisis/5' : 'border-brand/30 bg-brand/5'
+            className={`rounded-card border-l-4 p-4 ${
+              state.panel.isEscalation ? 'border-crisis bg-crisis/5' : 'border-brand-600 bg-brand-50'
             }`}
           >
-            <p className="text-sm font-medium text-gray-900">{state.panel.guidance}</p>
+            <p className="text-body-lg font-medium text-ink-900">{state.panel.guidance}</p>
           </div>
           <TracePanel panel={state.panel} lang={lang} />
 
           {/* ADVISORY referral (tk-0019) — non-emergency only, decision-inert. The server returns
               null for emergencies, so this never renders alongside an escalation. */}
           {state.referral && state.referral.citations.length > 0 && (
-            <section
-              data-testid="referral"
-              className="rounded-lg border border-gray-200 bg-gray-50 p-4"
-            >
-              <h3 className="text-sm font-medium text-gray-900">{t.referral.title}</h3>
-              <ul className="mt-2 space-y-2">
+            <section data-testid="referral" className="card p-4">
+              <h3 className="font-display text-base font-semibold text-ink-900">{t.referral.title}</h3>
+              <ul className="mt-2.5 space-y-2.5">
                 {state.referral.citations.map((c) => (
-                  <li key={c.id} data-testid="referral-citation" className="text-sm text-gray-700">
-                    <span className="font-medium text-gray-900">{c.title}</span>
-                    {c.category && (
-                      <span className="ml-2 rounded bg-gray-200 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-gray-600">
-                        {c.category}
-                      </span>
-                    )}
-                    <p className="text-gray-600">{c.body}</p>
+                  <li key={c.id} data-testid="referral-citation" className="rounded-stamp border border-ink-line bg-paper p-3">
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-medium text-ink-900">{c.title}</span>
+                      {c.category && (
+                        <span className="ledger-stamp-neutral text-[10px] uppercase">{c.category}</span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-stamp text-ink-700">{c.body}</p>
                   </li>
                 ))}
               </ul>
-              <p className="mt-3 text-[11px] italic text-gray-500">{state.referral.advisoryNote}</p>
+              <p className="mt-3 text-[12px] italic text-ink-500">{state.referral.advisoryNote}</p>
             </section>
           )}
         </div>
       )}
 
       {error && (
-        <p data-testid="agent-error" className="rounded-md bg-crisis/5 p-3 text-sm text-crisis">
+        <p data-testid="agent-error" className="rounded-card border-l-4 border-crisis bg-crisis/5 p-3 text-crisis">
           {t.errorGeneric}
         </p>
       )}
@@ -145,13 +149,13 @@ export function Chat({ agentId, lang }: { agentId?: string; lang: Lang }) {
           onKeyDown={(e) => {
             if (e.key === 'Enter') send();
           }}
-          className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
+          className="field flex-1"
         />
         <button
           type="button"
           onClick={send}
           disabled={pending}
-          className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="btn-primary shrink-0"
           // Per-tenant brand via the themed wrapper's --brand; falls back to the brand token elsewhere.
           style={{ backgroundColor: 'var(--brand, #0f766e)' }}
         >

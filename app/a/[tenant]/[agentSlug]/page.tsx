@@ -61,29 +61,36 @@ export default async function BrandedAgentPage({
       className="mx-auto max-w-2xl"
       style={themeStyle(theme)}
     >
-      <header className="flex items-center gap-3">
-        {theme.brandLogoUrl && (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            data-testid="brand-logo"
-            src={theme.brandLogoUrl}
-            alt={theme.displayName ?? tenant.name}
-            className="h-10 w-auto rounded"
-          />
-        )}
-        <div>
-          <h1 className="text-xl font-bold" style={{ color: 'var(--brand)' }} data-testid="brand-name">
-            {theme.displayName ?? agent.name}
-          </h1>
-          <p className="text-xs text-gray-500">{tenant.name}</p>
+      {/* Branded header — a thin top bar in the tenant's brand color anchors the identity without
+          letting a brand payload touch layout/footer (theme is sanitized upstream). */}
+      <header className="card overflow-hidden p-0">
+        <div aria-hidden className="h-1.5 w-full" style={{ backgroundColor: 'var(--brand)' }} />
+        <div className="flex items-center gap-3.5 p-5">
+          {theme.brandLogoUrl && (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              data-testid="brand-logo"
+              src={theme.brandLogoUrl}
+              alt={theme.displayName ?? tenant.name}
+              className="h-12 w-auto rounded-stamp"
+            />
+          )}
+          <div>
+            <h1 className="font-display text-display-md font-semibold" style={{ color: 'var(--brand)' }} data-testid="brand-name">
+              {theme.displayName ?? agent.name}
+            </h1>
+            <p className="text-stamp text-ink-500">{tenant.name}</p>
+          </div>
         </div>
       </header>
 
       <div className="mt-6">
         {chatEnabled ? (
-          <Chat agentId={agent.id} lang={lang} />
+          <div className="card p-5 sm:p-6">
+            <Chat agentId={agent.id} lang={lang} />
+          </div>
         ) : (
-          <p data-testid="chat-disabled" className="rounded-md bg-gray-50 p-4 text-sm text-gray-600">
+          <p data-testid="chat-disabled" className="card p-5 text-ink-700">
             {t.agent.intro}
           </p>
         )}

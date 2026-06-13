@@ -15,6 +15,7 @@ import {
   configureChannels,
   createAgent,
   publishAgent,
+  setAgentPolicyBundle,
   TOGGLEABLE_CHANNELS,
   type ToggleableChannel,
 } from '@/lib/auth/agents';
@@ -66,6 +67,17 @@ export async function publishAgentAction(agentId: string, formData: FormData): P
   await configureChannels(prisma, { actorRole: session.user.role, agentId, channels });
   await publishAgent(prisma, { actorRole: session.user.role, agentId });
   revalidatePath('/console/agents');
+  revalidatePath(`/console/agents/${agentId}`);
+}
+
+/**
+ * Set the agent's signed policy bundle (tk-0017). The service is fail-closed on an unknown version,
+ * so a tampered form value can never become the safety contract. Re-derives the session server-side.
+ */
+export async function setPolicyBundleAction(agentId: string, formData: FormData): Promise<void> {
+  const session = await requireSession();
+  const policyBundleVersion = String(formData.get('policyBundleVersion') ?? '').trim();
+  await setAgentPolicyBundle(prisma, { actorRole: session.user.role, agentId, policyBundleVersion });
   revalidatePath(`/console/agents/${agentId}`);
 }
 
