@@ -149,7 +149,8 @@ resource "aws_instance" "this" {
   user_data = templatefile("${path.module}/user_data.sh.tftpl", {
     repo_url = var.repo_url
     branch   = var.branch
-    hostname = "${aws_eip.this.public_ip}.sslip.io"
+    hostname = "spark.caramedical.com"
+    eip_host = "${aws_eip.this.public_ip}.sslip.io"
     env_b64  = base64encode(file("${path.module}/../.env"))
   })
   user_data_replace_on_change = true
