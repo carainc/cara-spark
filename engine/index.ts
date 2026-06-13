@@ -61,7 +61,10 @@ export function adjudicate(input: AdjudicateInput): AdjudicationTrace {
   }
 
   const redFlagResult = evaluateRedFlags(evidence, bundle.redFlagRules);
-  const decision = decide(redFlagResult, riskEstimate, bundle);
+  // tk-0027: evidence is threaded into decide() so the deterministic SDOH social-needs lane can detect
+  // a pure resource request. It only ever down-classifies a request with zero clinical signal; any
+  // clinical fact (and red flags, evaluated above) keep the clinical decision unchanged.
+  const decision = decide(redFlagResult, riskEstimate, bundle, evidence);
 
   // Fail-closed inference gate: any failed check forces BLOCK (no summary text in the engine path).
   const inference = runInferenceCheck(evidence, riskEstimate, redFlagResult, bundle, decision, {
