@@ -18,6 +18,19 @@ impossible to remove.
 
 ---
 
+## 👩‍⚖️ For Build Day judges
+
+- **Live demo:** https://spark.caramedical.com
+- **Test login** (use the email/password form): `test@cara-spark.com` · password `problemsolvers` — a throwaway demo admin on the `demo-chc` tenant (rotated right after Build Day).
+- **Live build-status board:** https://claude-build-day.caramedical.com/status — the autonomous build, ticket by ticket, with the run log.
+
+**What to look at — the 3 beats:**
+1. **Chat failsafe + provable trace.** Open the **Triage Demo** agent → *Preview* and describe an infant fever (e.g. "my 2-month-old has a fever of 101"). The deterministic engine forces an ED escalation the model **cannot** soften; the operator reasoning view shows the replayable trace — policy `familymed-v1` (authored by *Michael Hobbs, MD*) · checksum + signature **verified ✓**.
+2. **Same guardrail on voice/phone.** The standalone voice path (Telnyx → LiveKit/SIP → cascade worker) runs through the **same** engine and signed bundle.
+3. **Referral RAG / social needs.** Ask the agent for food → it routes to community resources and surfaces a food bank — advisory and **decision-inert** (it can never change a clinical disposition).
+
+---
+
 ## Why
 
 Accessibility is the thesis: reach the patients other tools miss.
