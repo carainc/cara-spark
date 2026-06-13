@@ -105,6 +105,8 @@ export interface RoutableAgent {
 export interface RoutingPrisma {
   agent: {
     findMany(args: { where: any; include?: any }): Promise<any[]>;
+    /** Single-agent lookup by id/slug — used by `resolveConfigAgent` (the Spark→prod config bridge). */
+    findFirst(args: { where: any; select?: any }): Promise<any | null>;
   };
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -245,4 +247,115 @@ export function safeRoutingLog(result: RoutingResult) {
     } as const;
   }
   return { matched: false, reason: result.reason } as const;
+}
+
+// ===========================================================================
+// Spark→prod-voice config bridge (tk-0026): resolve an agent from a per-call CONFIG fetch.
+//
+// The prod voice cascade fetches per-call config as `GET {VOICE_CONFIG_URL}/{room}?tenant&agentRef&did`.
+// To serve the Spark-authored config we must resolve the SAME Spark Agent from those inputs. This is
+// the config-time analogue of `resolveAgentByDid` (which is dispatch-time). It FAILS CLOSED: an
+// unknown / unpublished agent → null, so the route returns 404 and the cascade keeps its safe static
+// fallback. No PHI: room/agentRef are opaque ids; the DID is matched but never logged or returned.
+// ===========================================================================
+
+/** The published-agent slice the config bridge serves: identity + language + tone-only customization. */
+export interface ConfigAgent {
+  id: string;
+  /** Lowercased call language ('en' | 'es') derived from Agent.language (EN/ES). */
+  language: 'en' | 'es';
+  persona: string | null;
+  systemPromptExtra: string | null;
+  additionalInstructions: string | null;
+}
+
+/**
+ * Parse a Spark `Agent.id` out of a room name. We accept BOTH mint shapes:
+ *   • Spark: `voicephone-<agentId>-<suffix>`   (see `roomPrefixFor`)
+ *   • Prod:  `call-<tenantId>-<agentId>`        (the cara-prod cascade's room shape)
+ *
+ * cuids contain no `-`, so splitting on `-` is unambiguous: for `voicephone-` the agentId is the
+ * 2nd segment; for `call-` it is the 3rd (tenantId is the 2nd). Returns null for any other shape —
+ * the caller then falls back to did/agentRef, or fails closed.
+ */
+export function parseAgentIdFromRoom(room: string | null | undefined): string | null {
+  if (!room) return null;
+  const parts = room.trim().split('-');
+  if (parts[0] === 'voicephone' && parts[1]) return parts[1];
+  if (parts[0] === 'call' && parts[2]) return parts[2];
+  return null;
+}
+
+/** Project a raw agent row (Agent.language is EN/ES) to the served ConfigAgent shape. */
+function toConfigAgent(row: {
+  id: string;
+  language: string;
+  persona: string | null;
+  systemPromptExtra: string | null;
+  additionalInstructions: string | null;
+}): ConfigAgent {
+  return {
+    id: row.id,
+    language: row.language === 'ES' ? 'es' : 'en',
+    persona: row.persona ?? null,
+    systemPromptExtra: row.systemPromptExtra ?? null,
+    additionalInstructions: row.additionalInstructions ?? null,
+  };
+}
+
+const CONFIG_AGENT_SELECT = {
+  id: true,
+  language: true,
+  persona: true,
+  systemPromptExtra: true,
+  additionalInstructions: true,
+} as const;
+
+/**
+ * Resolve the per-call config inputs → the owning PUBLISHED Spark agent, or null (fail closed).
+ *
+ * Priority: (1) the agentId parsed from the room name, (2) the dialed DID (`resolveAgentByDid`),
+ * (3) `agentRef` (an agentId or a slug). The FIRST input that resolves a PUBLISHED agent wins. A
+ * draft/archived/unknown agent never resolves — the route then returns 404 and the cascade keeps
+ * its safe static fallback. The DID is matched but never logged or echoed (no PHI).
+ */
+export async function resolveConfigAgent(
+  prisma: RoutingPrisma,
+  inputs: { room?: string | null; did?: string | null; agentRef?: string | null },
+): Promise<ConfigAgent | null> {
+  // (1) room → agentId (PUBLISHED only).
+  const roomAgentId = parseAgentIdFromRoom(inputs.room);
+  if (roomAgentId) {
+    const row = await prisma.agent.findFirst({
+      where: { id: roomAgentId, status: 'PUBLISHED' },
+      select: CONFIG_AGENT_SELECT,
+    });
+    if (row) return toConfigAgent(row);
+  }
+
+  // (2) dialed DID → owning PUBLISHED agent (reuse the dispatch-time resolver; it already requires
+  //     PUBLISHED + an enabled PHONE channel and fails closed on ambiguity). We then re-load the
+  //     tone fields for the matched id.
+  if (inputs.did) {
+    const matched = await resolveAgentByDid(prisma, inputs.did);
+    if (matched.matched) {
+      const row = await prisma.agent.findFirst({
+        where: { id: matched.agentId, status: 'PUBLISHED' },
+        select: CONFIG_AGENT_SELECT,
+      });
+      if (row) return toConfigAgent(row);
+    }
+  }
+
+  // (3) agentRef → an agentId OR a slug (PUBLISHED only).
+  const ref = inputs.agentRef?.trim();
+  if (ref) {
+    const row = await prisma.agent.findFirst({
+      where: { status: 'PUBLISHED', OR: [{ id: ref }, { slug: ref }] },
+      select: CONFIG_AGENT_SELECT,
+    });
+    if (row) return toConfigAgent(row);
+  }
+
+  return null; // fail closed — the cascade keeps its safe static fallback.
 }
