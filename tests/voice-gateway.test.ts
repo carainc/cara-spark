@@ -105,8 +105,8 @@ describe('postCallResult — review queue', () => {
   });
 });
 
-describe('decide — wired to the deterministic engine, fails CLOSED pre-T1', () => {
-  it('propagates the engine NotImplemented error (so a live call never proceeds ungated)', async () => {
+describe('decide — wired to the deterministic engine (engine decides)', () => {
+  it('resolves with the engine deterministic disposition + trace (model proposes, engine decides)', async () => {
     const gw = new StandaloneVoiceGateway({ hmacSecret: SECRET });
     const evidence: EvidenceFact[] = [];
     const riskEstimate: RiskEstimate = {
@@ -127,8 +127,12 @@ describe('decide — wired to the deterministic engine, fails CLOSED pre-T1', ()
       evidence,
       riskEstimate,
     };
-    // Pre-T1 the engine throws NotImplemented; the API route catches it and returns the fail-closed
-    // BLOCK_AND_HUMAN_HANDOFF. Here we assert the wiring reaches the engine (does not silently pass).
-    await expect(gw.decide(req)).rejects.toThrow(/NotImplemented: engine\.adjudicate/);
+    // Post-T1: the engine adjudicates this proposal → ROUTINE_REVIEW (no red flag fired; confidence
+    // 0.5 is below the self-care threshold). decide RESOLVES with the engine's decision + a provable
+    // trace + bilingual guidance — the worker never picks a disposition itself.
+    const res = await gw.decide(req);
+    expect(res.action).toBe('ROUTINE_REVIEW');
+    expect(res.trace).toBeTruthy();
+    expect(res.guidance).toBeTruthy();
   });
 });
