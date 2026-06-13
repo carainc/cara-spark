@@ -35,6 +35,7 @@ const {
   isTerminal,
   latestUserText,
   failClosedGuidance,
+  ensureStartSubcommand,
 } = worker as {
   callDecide: (a: unknown) => Promise<{ action: string; guidance: string; failClosed?: boolean }>;
   proposeEvidence: (a: unknown) => Promise<{
@@ -47,6 +48,7 @@ const {
   isTerminal: (a: string) => boolean;
   latestUserText: (ctx: unknown) => string;
   failClosedGuidance: (l: string) => string;
+  ensureStartSubcommand: (argv: string[]) => string[];
 };
 
 afterEach(() => {
@@ -216,5 +218,47 @@ describe('worker latestUserText — extract the caller turn from a ChatContext',
   it('degrades to empty string on an unexpected shape (cautious, no throw)', () => {
     expect(latestUserText(undefined)).toBe('');
     expect(latestUserText({})).toBe('');
+  });
+});
+
+describe('worker ensureStartSubcommand — the worker actually boots in production', () => {
+  // Regression for the crash-loop: @livekit/agents cli.runApp() prints --help and exits when no
+  // subcommand is in argv. The worker must default to `start` so `node worker/index.mjs` boots.
+  it('inserts `start` when no subcommand is present (bare `node worker/index.mjs`)', () => {
+    expect(ensureStartSubcommand(['node', '/app/worker/index.mjs'])).toEqual([
+      'node',
+      '/app/worker/index.mjs',
+      'start',
+    ]);
+  });
+
+  it('preserves an explicit subcommand and its flags', () => {
+    for (const sub of ['start', 'dev', 'connect', 'download-files']) {
+      expect(ensureStartSubcommand(['node', 'index.mjs', sub])).toEqual(['node', 'index.mjs', sub]);
+    }
+    // flags after an explicit subcommand are untouched
+    expect(ensureStartSubcommand(['node', 'index.mjs', 'dev', '--log-level', 'debug'])).toEqual([
+      'node',
+      'index.mjs',
+      'dev',
+      '--log-level',
+      'debug',
+    ]);
+  });
+
+  it('inserts `start` before stray args when argv[2] is not a known subcommand', () => {
+    expect(ensureStartSubcommand(['node', 'index.mjs', '--log-level', 'info'])).toEqual([
+      'node',
+      'index.mjs',
+      'start',
+      '--log-level',
+      'info',
+    ]);
+  });
+
+  it('does not mutate the input argv (pure)', () => {
+    const argv = ['node', 'index.mjs'];
+    ensureStartSubcommand(argv);
+    expect(argv).toEqual(['node', 'index.mjs']);
   });
 });
