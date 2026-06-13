@@ -9,6 +9,7 @@ import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { seedSuperAdmin } from '../lib/auth/seed';
 import { demoPhoneDid } from '../lib/auth/bundle';
+import { TRIAGE_DEMO_PERSONA, TRIAGE_DEMO_ADDITIONAL_INSTRUCTIONS } from './triage-demo-persona';
 
 const prisma = new PrismaClient();
 
@@ -32,16 +33,27 @@ async function main() {
     });
   }
 
+  // The Triage Demo agent is wired to Dr. Hobbs's family-medicine bundle (tk-0025): the SIGNED
+  // `familymed-v1` gates DECIDE the disposition, and the persona (db/triage-demo-persona.ts) shapes
+  // ONLY the conversational voice (Phases 1–3 of the protocol). The persona carries NO disposition
+  // logic — no thresholds, no er_911/needs_review/home_care rules — those live exclusively in the
+  // engine bundle. Idempotent: the box runs `pnpm db:seed` on every deploy, so a redeploy re-applies.
+  const triageDemoFields = {
+    status: 'PUBLISHED' as const,
+    policyBundleVersion: 'familymed-v1',
+    persona: TRIAGE_DEMO_PERSONA,
+    additionalInstructions: TRIAGE_DEMO_ADDITIONAL_INSTRUCTIONS,
+  };
+
   const agent = await prisma.agent.upsert({
     where: { tenantId_slug: { tenantId: tenant.id, slug: 'triage-demo' } },
-    update: { status: 'PUBLISHED', policyBundleVersion: 'default-0.1.0' },
+    update: triageDemoFields,
     create: {
       tenantId: tenant.id,
       name: 'Triage Demo',
       slug: 'triage-demo',
-      status: 'PUBLISHED',
-      policyBundleVersion: 'default-0.1.0',
       language: 'EN',
+      ...triageDemoFields,
     },
   });
 

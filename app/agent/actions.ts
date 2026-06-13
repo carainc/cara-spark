@@ -17,7 +17,7 @@
  * patient typed. We never read or forward an identifier. Persistence (Lane F `recordCall`) stores the
  * PHI-free trace under an opaque identityRef only.
  */
-import { activePolicyBundle } from '@/engine/policy-bundle';
+import { activePolicyBundle, getRegisteredBundle } from '@/engine';
 import { recordCall } from '@/lib/audit/producer';
 import { prisma } from '@/lib/db';
 import { toModelIdentityContext } from '@/lib/identity/model-context';
@@ -32,6 +32,7 @@ import {
   type ReferralCitation,
 } from '@/lib/rag';
 import type { ReferralDeps } from '@/lib/agent/referral';
+import type { PolicyBundle } from '@/engine/types';
 import type { Lang } from '@/lib/i18n';
 
 export interface TurnRequest {
@@ -100,6 +101,23 @@ async function loadAgentCustomization(agentId?: string): Promise<AgentCustomizat
 }
 
 /**
+ * Resolve the agent's SIGNED policy bundle (tk-0025). Reads Agent.policyBundleVersion and looks it up
+ * in the engine's registry, so the Triage Demo agent (wired to `familymed-v1` in db/seed) adjudicates
+ * against the family-medicine gates while other agents keep the default. Falls back to the signed
+ * DEFAULT bundle when there is no agent or the version is not registered — fail-safe to the default,
+ * never an unverified or absent bundle. The bundle is still verified by the engine on adjudication.
+ */
+async function resolveAgentBundle(agentId?: string): Promise<PolicyBundle> {
+  if (!agentId) return activePolicyBundle();
+  const agent = await prisma.agent.findUnique({
+    where: { id: agentId },
+    select: { policyBundleVersion: true },
+  });
+  const resolved = agent?.policyBundleVersion ? getRegisteredBundle(agent.policyBundleVersion) : null;
+  return resolved ?? activePolicyBundle();
+}
+
+/**
  * Run a turn. The model call uses the BYO ANTHROPIC_API_KEY via `defaultCreateMessage`. On any model
  * error we fail safe to a generic message (the engine never sees malformed input — we just surface an
  * error). This action is intentionally thin: all logic lives in the unit-tested lib/agent modules.
@@ -110,8 +128,9 @@ export async function submitTurn(req: TurnRequest): Promise<TurnResponse> {
     const modelIdentity = toModelIdentityContext(identity);
     const lang = req.lang === 'es' ? 'es' : 'en';
 
-    // The signed-when-a-secret-is-set default bundle — the engine verifies + reports its signature.
-    const bundle = activePolicyBundle();
+    // The agent's SIGNED policy bundle (familymed-v1 for the Triage Demo agent; default otherwise) —
+    // the engine verifies + reports its signature. Falls back to the signed default (never absent).
+    const bundle = await resolveAgentBundle(req.agentId);
     const createMessage = await defaultCreateMessage();
     // Best-effort RAG seam; failure to build it just means no referral (never blocks the turn).
     const referralDeps = await buildReferralDeps(req.agentId).catch(() => undefined);

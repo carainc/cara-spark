@@ -180,3 +180,51 @@ export function activePolicyBundle(): PolicyBundle {
   const secret = process.env.VOICE_CONFIG_HMAC_SECRET;
   return secret ? signBundle(DEFAULT_POLICY, secret) : DEFAULT_POLICY;
 }
+
+// =============================================================================
+// Bundle registry (tk-0025) — the single source resolving a DB version string → a signed bundle.
+// =============================================================================
+
+/** The DB version string under which the engine default is selected/stored (mirrors lib/auth/bundle). */
+export const DEFAULT_BUNDLE_VERSION = 'default-0.1.0';
+
+/**
+ * A registered bundle: its DB version string + a builder that returns the runtime (signed-when-a-
+ * secret-is-set) bundle, plus optional provenance metadata for the catalog. The builder reads the env
+ * each call (loader concern) so a secret set after import still produces a signed bundle — exactly how
+ * activePolicyBundle()/activeFamilymedBundle() already behave.
+ */
+export interface RegisteredBundle {
+  version: string;
+  build: () => PolicyBundle;
+  isDefault: boolean;
+  author?: string;
+  source?: string;
+}
+
+/**
+ * The registry. Adding a NEW signed bundle = one entry here; every consumer (GET /api/bundles via
+ * lib/auth/bundle, the audit re-verify resolver, and the loop's per-agent resolution) reads through
+ * `getRegisteredBundle` / `listRegisteredBundles`, so a new bundle surfaces everywhere at once. The
+ * familymed-v1 entry is appended in engine/index.ts to avoid an import cycle (familymed-bundle.ts
+ * imports the create/sign helpers from this file).
+ */
+const BUNDLE_REGISTRY = new Map<string, RegisteredBundle>([
+  [DEFAULT_BUNDLE_VERSION, { version: DEFAULT_BUNDLE_VERSION, build: activePolicyBundle, isDefault: true }],
+]);
+
+/** Register (or replace) a bundle by its DB version string. Idempotent. */
+export function registerBundle(entry: RegisteredBundle): void {
+  BUNDLE_REGISTRY.set(entry.version, entry);
+}
+
+/** Resolve a DB version string → its runtime (signed-when-secret-set) bundle, or null if unknown. */
+export function getRegisteredBundle(version: string): PolicyBundle | null {
+  const entry = BUNDLE_REGISTRY.get(version);
+  return entry ? entry.build() : null;
+}
+
+/** The registered bundle metadata (version + provenance), default first, for the catalog. */
+export function listRegisteredBundles(): RegisteredBundle[] {
+  return [...BUNDLE_REGISTRY.values()].sort((a, b) => (a.isDefault === b.isDefault ? 0 : a.isDefault ? -1 : 1));
+}
