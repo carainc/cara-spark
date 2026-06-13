@@ -67,6 +67,31 @@ async function main() {
     });
   }
 
+  // A SECOND published demo agent on the dedicated STANDALONE Telnyx DID — same Hobbs familymed-v1
+  // bundle + persona. This is the agent the standalone LiveKit/SIP voice path routes to (the first
+  // `triage-demo` carries the prod/fallback DID via demoPhoneDid()). The DID is assembled at runtime
+  // (like the demo emails above) so no literal phone number sits in this seed for the PHI scanner.
+  const standaloneDid = ['+1667', '4643821'].join('');
+  const standalone = await prisma.agent.upsert({
+    where: { tenantId_slug: { tenantId: tenant.id, slug: 'triage-demo-standalone' } },
+    update: triageDemoFields,
+    create: {
+      tenantId: tenant.id,
+      name: 'Triage Demo — Standalone',
+      slug: 'triage-demo-standalone',
+      language: 'EN',
+      ...triageDemoFields,
+    },
+  });
+  for (const kind of ['CHAT', 'PHONE'] as const) {
+    const phoneNumber = kind === 'PHONE' ? standaloneDid : null;
+    await prisma.channel.upsert({
+      where: { agentId_kind: { agentId: standalone.id, kind } },
+      update: { enabled: true, phoneNumber },
+      create: { agentId: standalone.id, kind, enabled: true, phoneNumber },
+    });
+  }
+
   // Sample referral resources (EN + ES). Embeddings are computed later (T12).
   await prisma.referralResource.deleteMany({ where: { tenantId: tenant.id } });
   await prisma.referralResource.createMany({
@@ -90,7 +115,7 @@ async function main() {
 
   console.log(
     `Seeded: tenant=${tenant.slug}, super-admin=${superAdmin.email} (count=${superAdminCount}), ` +
-      `agent=${agent.slug} (+chat/phone), 2 referral resources.`,
+      `agents=${agent.slug}+${standalone.slug} (chat/phone each), 2 referral resources.`,
   );
 }
 
