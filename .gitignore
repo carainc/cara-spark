@@ -3,11 +3,16 @@ fable5-build-day-runbook.md
 cara-spark-kiosk-build-guide.md
 *runbook*.md
 *build-guide*.md
+RUN_STATE.md
 research/
 
 # Internal build-status dashboard (open locally; publish later if you want a public progress page)
 status.html
 status.json
+
+# --- Vercel deploy config for the internal status dashboard (never in OSS) ---
+.vercel/
+.vercelignore
 
 # --- Took task graph: local-only for now (carries internal refs: Linear IDs,
 #     prod-isolation specifics). Un-ignore when you want a sanitized public roadmap. ---

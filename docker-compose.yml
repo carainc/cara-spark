@@ -1,0 +1,104 @@
+# Cara Spark — the OSS deliverable: `docker compose up` boots the whole stack.
+# Single-VM networking (runbook §G): containers bind host ports; the EC2 SG is the only firewall.
+name: cara-spark
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: cara
+      POSTGRES_PASSWORD: cara
+      POSTGRES_DB: cara_spark
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cara -d cara_spark"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  # One-shot: apply schema + seed super-admin/sample, then exit. Built from the `build` stage
+  # (has prisma + tsx). App waits for this to complete.
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: build
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://cara:cara@postgres:5432/cara_spark?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: sh -c "pnpm db:push && pnpm db:seed"
+    restart: "no"
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://cara:cara@postgres:5432/cara_spark?schema=public
+      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      NEXTAUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      LIVEKIT_URL: ws://livekit:7880
+      LIVEKIT_API_KEY: devkey
+      LIVEKIT_API_SECRET: lk_local_dev_only_min_32_chars_000000000
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  livekit:
+    image: livekit/livekit-server:latest
+    command: ["--config", "/etc/livekit.yaml"]
+    volumes:
+      - ./config/livekit.yaml:/etc/livekit.yaml:ro
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "50000-50100:50000-50100/udp"
+
+  livekit-sip:
+    image: livekit/sip:latest
+    command: ["--config", "/etc/sip.yaml"]
+    volumes:
+      - ./config/sip.yaml:/etc/sip.yaml:ro
+    depends_on:
+      - livekit
+      - redis
+    ports:
+      - "5060:5060/udp"
+      - "10000-10100:10000-10100/udp"
+
+  agent-worker:
+    build:
+      context: .
+      dockerfile: worker.Dockerfile
+    env_file:
+      - .env
+    environment:
+      LIVEKIT_URL: ws://livekit:7880
+      LIVEKIT_API_KEY: devkey
+      LIVEKIT_API_SECRET: lk_local_dev_only_min_32_chars_000000000
+    depends_on:
+      - livekit
+    restart: unless-stopped
+
+volumes:
+  pgdata:

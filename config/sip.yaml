@@ -1,0 +1,10 @@
+# LiveKit SIP — LOCAL DEV config only. Lane G (T13) wires the Telnyx FQDN trunk + DTMF RFC2833
+# + G.711 codecs against the EC2 EIP. Dev keys here are NOT secrets.
+api_key: devkey
+api_secret: lk_local_dev_only_min_32_chars_000000000
+ws_url: ws://livekit:7880
+redis:
+  address: redis:6379
+sip_port: 5060
+rtp_port_range_start: 10000
+rtp_port_range_end: 10100

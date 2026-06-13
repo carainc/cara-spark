@@ -1,0 +1,12 @@
+# LiveKit server — LOCAL DEV config only. Lane G (T13) provides the standalone EC2 config
+# (nat_1_to_1_ip = EC2 EIP, real keys via .env). These dev keys are NOT secrets.
+port: 7880
+bind_addresses:
+  - "0.0.0.0"
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 50100
+  use_external_ip: false
+keys:
+  devkey: lk_local_dev_only_min_32_chars_000000000
