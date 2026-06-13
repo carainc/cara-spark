@@ -22,7 +22,7 @@ export const en = {
     note: 'The first person to sign in becomes the super-admin and invites the rest.',
     or: 'or',
     email: 'Email',
-    password: 'Password',
+    passwordLabel: 'Password',
     passwordSignIn: 'Sign in with email',
   },
   console: {

@@ -51,7 +51,7 @@ export default async function LoginPage() {
           name="password"
           type="password"
           required
-          placeholder={t.login.password}
+          placeholder={t.login.passwordLabel}
           autoComplete="current-password"
           className="w-full rounded-md border border-gray-300 px-3 py-2"
         />
