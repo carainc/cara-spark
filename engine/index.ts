@@ -7,7 +7,7 @@ import type { AdjudicateInput, AdjudicationTrace, BundleVerification, PolicyDeci
 import { evaluateRedFlags } from './redflags';
 import { decide } from './policy';
 import { runInferenceCheck } from './inference-check';
-import { verifyPolicyBundle } from './policy-bundle';
+import { verifyBundleSignature, verifyPolicyBundle } from './policy-bundle';
 
 export const ENGINE_VERSION = '1.0.0';
 
@@ -34,14 +34,18 @@ export function adjudicate(input: AdjudicateInput): AdjudicationTrace {
           requiresSummarySuppression: false,
         };
 
+  // tk-0018: signatureValid is a REAL HMAC verify — a forged/empty/wrong signature is REJECTED
+  // (presence alone never passes). The secret is read here (orchestrator) only to report the
+  // verification in the trace; the DECISION (decide) stays pure/env-free. Callers adjudicate against a
+  // signed bundle via activePolicyBundle(), so the demo trace shows "signature verified ✓".
+  const hmacSecret = process.env.VOICE_CONFIG_HMAC_SECRET;
   const verification = verifyPolicyBundle(bundle);
   const bundleVerification: BundleVerification = {
     policyVersion: bundle.metadata.policyVersion,
     checksum: bundle.metadata.checksum,
     checksumValid: verification.valid,
-    // Signature is verified with the secret at LOAD (loadPolicyBundle); the trace reflects that a
-    // signature is present on the bundle the agent loaded. The decision (decide) stays env-free.
-    signatureValid: Boolean(bundle.metadata.signature),
+    signatureValid:
+      Boolean(bundle.metadata.signature) && Boolean(hmacSecret) && verifyBundleSignature(bundle, hmacSecret as string),
     signedBy: bundle.metadata.signedBy,
   };
 

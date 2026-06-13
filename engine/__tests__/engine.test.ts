@@ -3,7 +3,7 @@
  * dominance, fail-closed, the 12-check inference gate, checksum stable/version-bump/tamper-rejected,
  * forward-only workflow, plus the red-flag operator + risk behaviors carried from VA-5.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   ALLOWED_ACTIONS,
   ACTION_SEVERITY,
@@ -223,5 +223,32 @@ describe('T2 — policy bundle signing (signature verified ✓)', () => {
     expect(verifyPolicyBundle(signed, secret).valid).toBe(true);
     expect(() => loadPolicyBundle(DEFAULT_POLICY, secret)).toThrow();
     expect(loadPolicyBundle(signed, secret)).toBe(signed);
+  });
+});
+
+describe('tk-0018 — adjudicate trace signatureValid is a REAL HMAC verify (not forgeable)', () => {
+  const SECRET = 'x'.repeat(40);
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('a properly signed bundle → signatureValid true', () => {
+    vi.stubEnv('VOICE_CONFIG_HMAC_SECRET', SECRET);
+    const trace = adjudicate({ evidence: infantFever, riskEstimate: risk(), bundle: signBundle(DEFAULT_POLICY, SECRET) });
+    expect(trace.bundle.signatureValid).toBe(true);
+  });
+
+  it('a FORGED signature → signatureValid false (presence alone must not pass)', () => {
+    vi.stubEnv('VOICE_CONFIG_HMAC_SECRET', SECRET);
+    const forged = {
+      ...DEFAULT_POLICY,
+      metadata: { ...DEFAULT_POLICY.metadata, signature: 'de'.repeat(32), signatureAlgorithm: 'hmac-sha256' as const },
+    };
+    const trace = adjudicate({ evidence: infantFever, riskEstimate: risk(), bundle: forged });
+    expect(trace.bundle.signatureValid).toBe(false);
+  });
+
+  it('unsigned default → signatureValid false even with the secret present', () => {
+    vi.stubEnv('VOICE_CONFIG_HMAC_SECRET', SECRET);
+    const trace = adjudicate({ evidence: infantFever, riskEstimate: risk(), bundle: DEFAULT_POLICY });
+    expect(trace.bundle.signatureValid).toBe(false);
   });
 });

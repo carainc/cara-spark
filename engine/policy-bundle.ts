@@ -169,3 +169,14 @@ export const DEFAULT_POLICY: PolicyBundle = {
 };
 
 export const DEFAULT_POLICY_BUNDLE = DEFAULT_POLICY;
+
+/**
+ * The runtime "active" bundle: the default policy SIGNED with VOICE_CONFIG_HMAC_SECRET when it is set,
+ * so the provable trace renders "signature verified ✓" (tk-0018). Falls back to the unsigned default
+ * locally / in tests with no secret. Reading the env is a config/LOADER concern — the deterministic
+ * DECISION (decide) stays env-free. The chat + voice paths adjudicate against this.
+ */
+export function activePolicyBundle(): PolicyBundle {
+  const secret = process.env.VOICE_CONFIG_HMAC_SECRET;
+  return secret ? signBundle(DEFAULT_POLICY, secret) : DEFAULT_POLICY;
+}
