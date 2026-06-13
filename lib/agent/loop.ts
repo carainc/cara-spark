@@ -12,6 +12,11 @@
  * engine's binding decision. That is the thesis, enforced by data flow: `adjudicate` consumes only
  * the typed evidence + risk, and `guidanceFor` is keyed by `trace.decision.action`.
  *
+ * Multi-turn: the engine adjudicates EVERY turn (unchanged), but the panel carries a `turnMode`
+ * (`buildTracePanel` → `decideTurnMode`) so the UI knows whether to CONVERSE (a no-red-flag, low
+ * confidence/coverage block → keep gathering info) or PRESENT a final safe next step. Emergencies,
+ * red flags, and fail-closed blocks always present — the decision itself is untouched here.
+ *
  * tk-0012 / tk-0018: the loop adjudicates against `activePolicyBundle()` — the OSS DEFAULT_POLICY
  * SIGNED with VOICE_CONFIG_HMAC_SECRET when it is set — so the provable trace renders
  * "signature verified ✓" in the demo (and "unsigned" locally with no secret). The engine reads the

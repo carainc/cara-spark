@@ -35,6 +35,18 @@ describe('i18n — agent-config + landing copy is present in both languages', ()
     expect(es.agentConfig.channels.didNote).not.toBe(en.agentConfig.channels.didNote);
   });
 
+  it('the new multi-turn / debug-toggle agent strings (tk-0029) are translated in both languages', () => {
+    // The Dict type already forces these keys to exist in both; this guards they are non-empty AND
+    // actually translated (ES ≠ EN) for the visible, prose-heavy ones.
+    for (const dict of [en, es]) {
+      expect(dict.agent.continuePrompt.trim()).toBeTruthy();
+      expect(dict.agent.showReasoning.trim()).toBeTruthy();
+      expect(dict.agent.showReasoningHint.trim()).toBeTruthy();
+    }
+    expect(es.agent.continuePrompt).not.toBe(en.agent.continuePrompt);
+    expect(es.agent.showReasoning).not.toBe(en.agent.showReasoning);
+  });
+
   it('the five config tabs are all labeled in both languages', () => {
     for (const tabs of [en.agentConfig.tabs, es.agentConfig.tabs]) {
       expect(Object.values(tabs).every((v) => v.trim().length > 0)).toBe(true);
