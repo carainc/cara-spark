@@ -32,15 +32,16 @@ Always reconcile "what's next" against `took task ready` ∩ runbook §2 lanes.
 - **cut (close with "CUT per §2"):** tk-0003 (T3 AI builder) · tk-0008 (T8 clinician console)
 - **done:** _none_   ·   **in-progress:** _none_   ·   **parked:** _none_
 
-## Open human-gates (G0 — the only hard blocker)
-- ⏸ **AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET** — IN PROGRESS (creating the Google OAuth web
-  client). Last open gate. Parks only T14 auth-login; all other lanes proceed. On receipt:
-  store in `~/.claude/voice-run.env`, generate `AUTH_SECRET`, clear this gate.
-- ✅ AWS_REGION = us-east-1 (confirmed)
+## Open human-gates (G0 — ✅ ALL CLEAR — ready to launch)
+- ✅ AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET — stored in `~/.claude/voice-run.env`. Web client,
+  redirect `http://localhost:3000/api/auth/callback/google` set; **add the prod
+  `https://<deploy-host>/api/auth/callback/google` URI to the SAME client once the EC2 host
+  is known** (Google rejects raw IPs / non-https → deploy needs a hostname + TLS).
+- ✅ AUTH_SECRET generated · SUPERADMIN_EMAIL = nils@caramedical.com
+- ✅ AWS_REGION = us-east-1  ·  AWS_PROFILE = cara-prod
 - ✅ ANTHROPIC credits confirmed — org holding ANTHROPIC_API_KEY has the Build-Day promo credits
 - ✅ GITHUB_REPO = github.com/carainc/cara-spark (origin set)
-- ✅ SUPERADMIN_EMAIL = nils@caramedical.com
-- ✅ AWS_PROFILE = cara-prod
+- Remaining manual step at launch: `aws sso login --profile cara-prod` (one browser approval).
 
 ## Secrets source
 All BYO keys live in `~/.claude/voice-run.env` (mode 600): LIVEKIT_*, DEEPGRAM_API_KEY,
