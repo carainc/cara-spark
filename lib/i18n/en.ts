@@ -126,6 +126,12 @@ export const en = {
       cannotSoften: 'The model cannot soften or override a fired red flag.',
       escalationLocked: 'Emergency escalation — locked by the engine.',
     },
+    // Advisory referral (demo beat 3 / tk-0019) — appended AFTER a non-emergency disposition only.
+    // Decision-inert: these resources never change the clinical recommendation.
+    referral: {
+      title: 'Community resources you may find helpful',
+      decisionInert: 'Advisory · these do not change the clinical recommendation',
+    },
   },
 };
 

@@ -14,6 +14,7 @@ import { useState, useTransition } from 'react';
 import { getDict, type Lang } from '@/lib/i18n';
 import type { ChatTurn } from '@/lib/agent/extract';
 import type { TracePanelView } from '@/lib/agent/guidance';
+import type { ReferralView } from '@/lib/agent/loop';
 import { TracePanel } from './TracePanel';
 import { submitTurn } from './actions';
 
@@ -22,12 +23,14 @@ interface Rendered {
   panel: TracePanelView | null;
   /** The model's conversational reply for the latest turn (bubble only). */
   reply: string | null;
+  /** ADVISORY referral (non-emergency only); null when none was surfaced. */
+  referral: ReferralView | null;
 }
 
 export function Chat({ agentId, lang }: { agentId?: string; lang: Lang }) {
   const t = getDict(lang).agent;
   const [input, setInput] = useState('');
-  const [state, setState] = useState<Rendered>({ history: [], panel: null, reply: null });
+  const [state, setState] = useState<Rendered>({ history: [], panel: null, reply: null, referral: null });
   const [error, setError] = useState(false);
   const [pending, start] = useTransition();
 
@@ -48,7 +51,12 @@ export function Chat({ agentId, lang }: { agentId?: string; lang: Lang }) {
       const nextHistory: ChatTurn[] = res.assistantText
         ? [...history, { role: 'assistant', text: res.assistantText }]
         : history;
-      setState({ history: nextHistory, panel: res.panel, reply: res.assistantText ?? null });
+      setState({
+        history: nextHistory,
+        panel: res.panel,
+        reply: res.assistantText ?? null,
+        referral: res.referral ?? null,
+      });
     });
   }
 
@@ -91,6 +99,31 @@ export function Chat({ agentId, lang }: { agentId?: string; lang: Lang }) {
             <p className="text-sm font-medium text-gray-900">{state.panel.guidance}</p>
           </div>
           <TracePanel panel={state.panel} lang={lang} />
+
+          {/* ADVISORY referral (tk-0019) — non-emergency only, decision-inert. The server returns
+              null for emergencies, so this never renders alongside an escalation. */}
+          {state.referral && state.referral.citations.length > 0 && (
+            <section
+              data-testid="referral"
+              className="rounded-lg border border-gray-200 bg-gray-50 p-4"
+            >
+              <h3 className="text-sm font-medium text-gray-900">{t.referral.title}</h3>
+              <ul className="mt-2 space-y-2">
+                {state.referral.citations.map((c) => (
+                  <li key={c.id} data-testid="referral-citation" className="text-sm text-gray-700">
+                    <span className="font-medium text-gray-900">{c.title}</span>
+                    {c.category && (
+                      <span className="ml-2 rounded bg-gray-200 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-gray-600">
+                        {c.category}
+                      </span>
+                    )}
+                    <p className="text-gray-600">{c.body}</p>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-3 text-[11px] italic text-gray-500">{state.referral.advisoryNote}</p>
+            </section>
+          )}
         </div>
       )}
 
