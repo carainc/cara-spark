@@ -1,0 +1,133 @@
+/**
+ * Agent CRUD + per-agent channel toggles (T14 / Lane E — the create→configure→publish beat).
+ *
+ *  - create:    a DRAFT agent on the actor's tenant, defaulted to the signed DEFAULT bundle.
+ *  - configure: toggle chat / voice / phone channels (upserted per kind). Enabling PHONE stamps
+ *               the read-only demo DID so the number is never blank.
+ *  - publish:   flip status → PUBLISHED. This is what the runtime (engine B / voice G) reads to
+ *               know an agent is live; auth only sets the row, it never adjudicates anything.
+ *
+ * All functions take an injected Prisma-like client + the actor's role so they are guarded and
+ * unit-testable with a mock (no network). The deterministic engine owns dispositions — not this.
+ */
+import type { AgentStatus, ChannelKind, Language, Role } from '@prisma/client';
+import { canManageAgents } from './roles';
+import { DEFAULT_POLICY_BUNDLE_VERSION, demoPhoneDid } from './bundle';
+
+/** Channels the creator can toggle in the console (KIOSK is provisioned elsewhere). */
+export const TOGGLEABLE_CHANNELS = ['CHAT', 'VOICE', 'PHONE'] as const;
+export type ToggleableChannel = (typeof TOGGLEABLE_CHANNELS)[number];
+
+export interface AgentRow {
+  id: string;
+  tenantId: string;
+  name: string;
+  slug: string;
+  status: AgentStatus;
+  policyBundleVersion: string;
+  language: Language;
+}
+
+export interface ChannelRow {
+  id: string;
+  agentId: string;
+  kind: ChannelKind;
+  enabled: boolean;
+  phoneNumber: string | null;
+}
+
+/**
+ * Narrow structural slice of PrismaClient used by the agent services. Arg types are loose (`any`)
+ * so both the real `PrismaClient` and a test mock satisfy it; return types stay strict.
+ */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export interface AgentPrisma {
+  agent: {
+    create(args: { data: any }): Promise<AgentRow>;
+    update(args: { where: any; data: any }): Promise<AgentRow>;
+    findUnique(args: { where: any; include?: any }): Promise<(AgentRow & { channels?: ChannelRow[] }) | null>;
+  };
+  channel: {
+    upsert(args: {
+      where: { agentId_kind: { agentId: string; kind: ChannelKind } };
+      update: any;
+      create: any;
+    }): Promise<ChannelRow>;
+  };
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+/** slugify a display name → URL-safe, lower-kebab. Empty input falls back to "agent". */
+export function slugify(name: string): string {
+  const slug = name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return slug || 'agent';
+}
+
+export interface CreateAgentInput {
+  actorRole: Role | undefined | null;
+  tenantId: string;
+  name: string;
+  language?: Language;
+}
+
+/** Create a DRAFT agent on the actor's tenant. Guarded: a user with no manage capability is
+ *  rejected. Defaults to the signed DEFAULT policy bundle (tk-0017 will let admins switch). */
+export async function createAgent(db: AgentPrisma, input: CreateAgentInput): Promise<AgentRow> {
+  if (!canManageAgents(input.actorRole)) throw new Error('Forbidden: insufficient role to create an agent.');
+  const name = input.name.trim();
+  if (!name) throw new Error('An agent name is required.');
+  return db.agent.create({
+    data: {
+      tenantId: input.tenantId,
+      name,
+      slug: slugify(name),
+      status: 'DRAFT',
+      policyBundleVersion: DEFAULT_POLICY_BUNDLE_VERSION,
+      language: input.language ?? 'EN',
+    },
+  });
+}
+
+export interface ChannelToggleInput {
+  actorRole: Role | undefined | null;
+  agentId: string;
+  /** Desired enabled-state per channel kind; omit a kind to leave it untouched. */
+  channels: Partial<Record<ToggleableChannel, boolean>>;
+}
+
+/**
+ * Configure an agent's channel toggles. Enabling PHONE attaches the read-only demo DID (never an
+ * empty field); disabling clears nothing destructive. Returns the upserted channel rows.
+ */
+export async function configureChannels(db: AgentPrisma, input: ChannelToggleInput): Promise<ChannelRow[]> {
+  if (!canManageAgents(input.actorRole)) throw new Error('Forbidden: insufficient role to configure an agent.');
+  const out: ChannelRow[] = [];
+  for (const kind of TOGGLEABLE_CHANNELS) {
+    const desired = input.channels[kind];
+    if (desired === undefined) continue;
+    // PHONE always surfaces a number when enabled — sourced from config, display-only.
+    const phoneNumber = kind === 'PHONE' && desired ? demoPhoneDid() : null;
+    const row = await db.channel.upsert({
+      where: { agentId_kind: { agentId: input.agentId, kind } },
+      update: { enabled: desired, phoneNumber },
+      create: { agentId: input.agentId, kind, enabled: desired, phoneNumber },
+    });
+    out.push(row);
+  }
+  return out;
+}
+
+export interface PublishAgentInput {
+  actorRole: Role | undefined | null;
+  agentId: string;
+}
+
+/** Flip an agent to PUBLISHED — the runtime reads this. Guarded by manage capability. */
+export async function publishAgent(db: AgentPrisma, input: PublishAgentInput): Promise<AgentRow> {
+  if (!canManageAgents(input.actorRole)) throw new Error('Forbidden: insufficient role to publish an agent.');
+  return db.agent.update({ where: { id: input.agentId }, data: { status: 'PUBLISHED' } });
+}

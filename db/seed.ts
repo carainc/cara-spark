@@ -1,26 +1,18 @@
 /**
  * Seed: a bootstrap super-admin (from SUPERADMIN_EMAIL — NO hard-coded creds), a sample tenant +
  * agent with chat/phone channels, and sample bilingual referral resources. Idempotent.
+ *
+ * The bootstrap super-admin contract lives in lib/auth/seed.ts (`seedSuperAdmin`) so it is
+ * unit-tested with a mocked Prisma; this script is the thin runnable wrapper + demo data.
  */
 import { PrismaClient } from '@prisma/client';
+import { seedSuperAdmin } from '../lib/auth/seed';
+import { demoPhoneDid } from '../lib/auth/bundle';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const superEmail = process.env.SUPERADMIN_EMAIL?.toLowerCase();
-  if (!superEmail) throw new Error('SUPERADMIN_EMAIL is required to seed the bootstrap super-admin.');
-
-  const tenant = await prisma.tenant.upsert({
-    where: { slug: 'demo-chc' },
-    update: {},
-    create: { name: 'Demo Community Health Center', slug: 'demo-chc', defaultLanguage: 'EN' },
-  });
-
-  await prisma.user.upsert({
-    where: { email: superEmail },
-    update: { role: 'SUPER_ADMIN', tenantId: tenant.id },
-    create: { email: superEmail, role: 'SUPER_ADMIN', tenantId: tenant.id },
-  });
+  const { tenant, superAdmin, superAdminCount } = await seedSuperAdmin(prisma);
 
   const agent = await prisma.agent.upsert({
     where: { tenantId_slug: { tenantId: tenant.id, slug: 'triage-demo' } },
@@ -36,10 +28,12 @@ async function main() {
   });
 
   for (const kind of ['CHAT', 'PHONE'] as const) {
+    // PHONE surfaces the read-only demo DID (never an empty field); CHAT carries no number.
+    const phoneNumber = kind === 'PHONE' ? demoPhoneDid() : null;
     await prisma.channel.upsert({
       where: { agentId_kind: { agentId: agent.id, kind } },
-      update: { enabled: true },
-      create: { agentId: agent.id, kind, enabled: true },
+      update: { enabled: true, phoneNumber },
+      create: { agentId: agent.id, kind, enabled: true, phoneNumber },
     });
   }
 
@@ -64,7 +58,10 @@ async function main() {
     ],
   });
 
-  console.log(`Seeded: tenant=${tenant.slug}, super-admin=${superEmail}, agent=${agent.slug} (+chat/phone), 2 referral resources.`);
+  console.log(
+    `Seeded: tenant=${tenant.slug}, super-admin=${superAdmin.email} (count=${superAdminCount}), ` +
+      `agent=${agent.slug} (+chat/phone), 2 referral resources.`,
+  );
 }
 
 main()

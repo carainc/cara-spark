@@ -16,8 +16,14 @@ export default async function ConsolePage() {
         {role === 'SUPER_ADMIN' ? t.console.superAdmin : role}
       </p>
       <p className="mt-6 text-gray-700">
-        Cara Spark console — agent creation, channels, and invites land here (Lane E / T14).
+        Cara Spark console — create triage agents, pick channels, and invite teammates.
       </p>
+      <Link
+        href="/console/agents"
+        className="mt-4 inline-block rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800"
+      >
+        {t.console.createAgent}
+      </Link>
 
       {/* Lane F (T11/T12) entry points — the call audit trail + referral resources. */}
       <nav className="mt-6 flex flex-wrap gap-3">
