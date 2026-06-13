@@ -161,3 +161,18 @@ resource "aws_eip_association" "this" {
   instance_id   = aws_instance.this.id
   allocation_id = aws_eip.this.id
 }
+
+// spark.caramedical.com — the demo subdomain. NS delegation at the caramedical.com apex is a one-time
+// external step (see the spark_nameservers output). Until delegated, the deploy uses the sslip.io host.
+resource "aws_route53_zone" "spark" {
+  name = "spark.caramedical.com"
+  tags = { Name = "cara-spark-demo" }
+}
+
+resource "aws_route53_record" "spark_a" {
+  zone_id = aws_route53_zone.spark.zone_id
+  name    = "spark.caramedical.com"
+  type    = "A"
+  ttl     = 300
+  records = [aws_eip.this.public_ip]
+}

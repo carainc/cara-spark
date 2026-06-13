@@ -4,6 +4,7 @@ cara-spark-kiosk-build-guide.md
 *runbook*.md
 *build-guide*.md
 RUN_STATE.md
+JUDGE.md
 research/
 
 # Internal build-status dashboard (open locally; publish later if you want a public progress page)
