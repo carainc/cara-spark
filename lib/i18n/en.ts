@@ -211,6 +211,10 @@ export const en = {
     agentLabel: 'Cara Spark',
     restart: 'Start over',
     errorGeneric: 'Something went wrong reviewing that. Please try again, or call your clinic. If this is an emergency, call 911.',
+    // Shown when the deterministic engine routes a PURE social/resource (SDOH) request — never the
+    // clinical self-care text. The community-resource referral (e.g. a food bank) is appended below it.
+    socialNeedGuidance:
+      "It sounds like you're looking for community support rather than medical care — here are some local resources that may help. If anything about your health changes, you can start a new check anytime.",
     // Canned guidance per AllowedAction — the ONLY clinical text the agent emits. The model cannot write these.
     guidance: {
       SELF_CARE_INFO_ONLY:

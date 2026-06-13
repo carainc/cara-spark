@@ -6,6 +6,7 @@
  *    checksum ok · signature verified). Pure: no AI, no DB, no React. Unit-tested directly.
  */
 import type { AdjudicationTrace, AllowedAction } from '@/engine/types';
+import { SDOH_DECISION_REASON } from '@/engine/policy';
 import { getDict, type Lang } from '@/lib/i18n';
 
 /** Actions that are an emergency escalation the model may never override or soften. */
@@ -38,6 +39,8 @@ export interface TracePanelView {
   action: AllowedAction;
   guidance: string;
   isEscalation: boolean;
+  /** True when the engine routed a pure social/resource (SDOH) request — show community-resource copy + the referral, not clinical self-care text. */
+  socialNeed: boolean;
   /** True when a red-flag rule fired → the model is structurally locked out of softening it. */
   redFlagFired: boolean;
   evidence: TraceEvidenceView[];
@@ -63,10 +66,15 @@ export interface TracePanelView {
  */
 export function buildTracePanel(trace: AdjudicationTrace, lang: Lang): TracePanelView {
   const action = trace.decision.action;
+  // A pure social/resource (SDOH) request maps to SELF_CARE_INFO_ONLY but must NOT show clinical
+  // self-care copy ("rest, stay hydrated") — show community-resource framing; the loop appends the
+  // (decision-inert) food-bank/referral citations below it.
+  const socialNeed = trace.decision.decisionReason === SDOH_DECISION_REASON;
   return {
     action,
-    guidance: guidanceFor(action, lang),
+    guidance: socialNeed ? getDict(lang).agent.socialNeedGuidance : guidanceFor(action, lang),
     isEscalation: ESCALATION_ACTIONS.has(action),
+    socialNeed,
     redFlagFired: trace.redFlagResult.triggered,
     evidence: trace.evidence.map((e) => ({
       factType: e.factType,

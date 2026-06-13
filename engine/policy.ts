@@ -129,6 +129,14 @@ export function isPureSocialNeed(evidence: readonly EvidenceFact[]): boolean {
   return sawSocialNeed;
 }
 
+/**
+ * tk-0027 — the single decisionReason the SDOH lane stamps. Exported so the presentation layer can
+ * key social-needs copy off it (a pure resource request must NOT show clinical self-care text like
+ * "rest and stay hydrated"). The engine still decides SELF_CARE_INFO_ONLY; this is only the marker.
+ */
+export const SDOH_DECISION_REASON =
+  'social/resource need — routed to community resources, no clinical concern detected';
+
 export function decide(
   redFlagResult: RedFlagResult,
   riskEstimate: RiskEstimate,
@@ -192,8 +200,7 @@ export function decide(
   ) {
     return {
       action: 'SELF_CARE_INFO_ONLY',
-      decisionReason:
-        'social/resource need — routed to community resources, no clinical concern detected',
+      decisionReason: SDOH_DECISION_REASON,
       policyVersion,
       ruleIdsApplied: [],
       requiresHumanReview: false,

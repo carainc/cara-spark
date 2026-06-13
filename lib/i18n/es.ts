@@ -207,6 +207,8 @@ export const es: Dict = {
     agentLabel: 'Cara Spark',
     restart: 'Empezar de nuevo',
     errorGeneric: 'Algo salió mal al revisar eso. Inténtelo de nuevo o llame a su clínica. Si es una emergencia, llame al 911.',
+    socialNeedGuidance:
+      'Parece que está buscando apoyo comunitario más que atención médica — aquí hay algunos recursos locales que podrían ayudar. Si algo en su salud cambia, puede iniciar una nueva consulta en cualquier momento.',
     guidance: {
       SELF_CARE_INFO_ONLY:
         'Según lo que compartió, esto suele poder manejarse con autocuidado en casa. Vigile sus síntomas, descanse e hidrátese. Si algo empeora o le preocupa, comuníquese con su clínica.',
