@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { auth, signOut } from '@/lib/auth';
 import { getDict } from '@/lib/i18n';
 import { getLang } from '@/lib/i18n/server';
@@ -17,6 +18,22 @@ export default async function ConsolePage() {
       <p className="mt-6 text-gray-700">
         Cara Spark console — agent creation, channels, and invites land here (Lane E / T14).
       </p>
+
+      {/* Lane F (T11/T12) entry points — the call audit trail + referral resources. */}
+      <nav className="mt-6 flex flex-wrap gap-3">
+        <Link
+          href="/console/calls"
+          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium hover:bg-gray-50"
+        >
+          {t.calls.title} →
+        </Link>
+        <Link
+          href="/console/resources"
+          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium hover:bg-gray-50"
+        >
+          {t.resources.title} →
+        </Link>
+      </nav>
       <form
         action={async () => {
           'use server';
