@@ -78,6 +78,11 @@ export const es: Dict = {
     category: 'Categoría',
     decisionInert: 'Informativo · no puede cambiar una decisión',
   },
+  kiosk: {
+    disclaimer:
+      'Hola, estoy aquí para ayudarle a decidir qué hacer. Esto no es atención de emergencia — si es una emergencia le ayudaré a llamar al 9 1 1. Presione el botón y dígame qué le pasa.',
+    offline: 'No me puedo conectar en este momento — por favor busque al personal del lugar. Si es una emergencia, llame al 9 1 1.',
+  },
   agent: {
     intro:
       'Describa qué está pasando. Esta herramienta solo recopila información y le da un próximo paso seguro — nunca diagnostica ni trata. No comparta su nombre ni su fecha de nacimiento.',

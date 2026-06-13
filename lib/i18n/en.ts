@@ -76,6 +76,15 @@ export const en = {
     category: 'Category',
     decisionInert: 'Advisory · cannot change a disposition',
   },
+  // Kiosk (T16): a phone-less, account-less one-button box. No screen → the disclaimer is SPOKEN
+  // every session (TTS-shaped: "9 1 1" is spelled out). Bilingual is core; both are spoken on wake.
+  kiosk: {
+    // The spoken greeting + not-emergency-care disclaimer, played on wake before the first press.
+    disclaimer:
+      "Hi, I'm here to help you figure out what to do. This is not emergency care — if this is an emergency I'll help you call 9 1 1. Press the button and tell me what's going on.",
+    // Spoken when the box cannot reach the server. Fail-safe, never silent (build guide §7).
+    offline: "I can't connect right now — please find on-site staff. If this is an emergency, call 9 1 1.",
+  },
   // The conversational triage agent (Lane D / T7). The MODEL proposes; the deterministic ENGINE decides.
   agent: {
     intro:
