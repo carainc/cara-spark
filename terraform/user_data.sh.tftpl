@@ -1,0 +1,43 @@
+#!/bin/bash
+# Cara Spark EC2 bootstrap — clone the public repo, inject .env, docker compose up, Caddy auto-TLS.
+# Terraform fills repo_url/branch/hostname/env_b64 below; shell vars use $NAME (no braces).
+set -uxo pipefail
+exec > /var/log/cara-spark-bootstrap.log 2>&1
+echo "[bootstrap] start $(date -u)"
+
+dnf install -y docker git
+systemctl enable --now docker
+
+# docker compose plugin
+mkdir -p /usr/local/lib/docker/cli-plugins
+curl -fsSL https://github.com/docker/compose/releases/download/v2.30.3/docker-compose-linux-x86_64 \
+  -o /usr/local/lib/docker/cli-plugins/docker-compose
+chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+cd /opt
+git clone --branch ${branch} --depth 1 ${repo_url} cara-spark
+cd /opt/cara-spark
+
+# Inject the BYO-key .env (base64 from terraform), then point auth at the public HTTPS host.
+echo "${env_b64}" | base64 -d > .env
+HOST="${hostname}"
+EIP_HOST="${eip_host}"
+# AUTH_URL is the canonical (spark) host for OAuth callbacks; Caddy also serves the sslip.io host.
+sed -i "s#^AUTH_URL=.*#AUTH_URL=https://$HOST#" .env
+sed -i "s#^NEXTAUTH_URL=.*#NEXTAUTH_URL=https://$HOST#" .env
+
+# Bring up the app stack (migrate runs schema+seed, then app starts).
+docker compose up -d --build
+
+# Caddy reverse proxy with automatic HTTPS for the sslip.io hostname (no domain needed).
+cat > /opt/cara-spark/Caddyfile <<CADDY
+$HOST, $EIP_HOST {
+  reverse_proxy localhost:3000
+}
+CADDY
+docker run -d --name caddy --restart unless-stopped --network host \
+  -v /opt/cara-spark/Caddyfile:/etc/caddy/Caddyfile:ro \
+  -v caddy_data:/data -v caddy_config:/config \
+  caddy:2
+
+echo "[bootstrap] done $(date -u) — https://$HOST"

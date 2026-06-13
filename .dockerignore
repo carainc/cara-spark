@@ -1,0 +1,17 @@
+node_modules
+.next
+.git
+.env
+.env.*
+!.env.example
+*.tfstate
+*.tfstate.*
+.terraform
+terraform/.terraform
+research
+status.html
+status.json
+*runbook*.md
+*build-guide*.md
+coverage
+.DS_Store

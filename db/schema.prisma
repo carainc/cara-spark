@@ -1,0 +1,223 @@
+// ⛓ FROZEN CONTRACT #2 of 4 — the shared data model.
+//
+// OSS single-tenant law (runbook §3): no Cognito, no per-tenant databases, one Postgres
+// (+ pgvector for RAG — no separate vector DB). `Tenant` is a row, not a database.
+// Lane E (T14) owns Tenant/User/Agent/Channel/Invite; Lane F (T11/T12) owns Call/AuditEntry
+// + ReferralResource. Changing a frozen contract mid-build = a coordinated edit logged in
+// RUN_STATE.md, never silent.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+  // native = local dev; debian/musl = the Linux container + EC2 deploy target.
+  binaryTargets   = ["native", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+// =============================================================================
+// Auth.js (Google OAuth only — no Cognito, no GitHub)
+// =============================================================================
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  EDITOR
+}
+
+enum Language {
+  EN
+  ES
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  image         String?
+  emailVerified DateTime?
+  passwordHash  String? // bcrypt hash for the Credentials login (super-admin/admins); null = OAuth-only
+  role          Role      @default(EDITOR)
+  tenantId      String?
+  tenant        Tenant?   @relation(fields: [tenantId], references: [id])
+  accounts      Account[]
+  sessions      Session[]
+  invitesSent   Invite[]  @relation("InvitedBy")
+  createdAt     DateTime  @default(now())
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// =============================================================================
+// Tenancy / org (the CHC) + branding
+// =============================================================================
+
+model Tenant {
+  id              String             @id @default(cuid())
+  name            String
+  slug            String             @unique
+  brandLogoUrl    String?
+  brandColor      String?            @default("#0f766e")
+  defaultLanguage Language           @default(EN)
+  users           User[]
+  agents          Agent[]
+  invites         Invite[]
+  resources       ReferralResource[]
+  createdAt       DateTime           @default(now())
+}
+
+model Invite {
+  id          String    @id @default(cuid())
+  email       String
+  role        Role      @default(EDITOR)
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invitedById String?
+  invitedBy   User?     @relation("InvitedBy", fields: [invitedById], references: [id])
+  token       String    @unique
+  acceptedAt  DateTime?
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+
+  @@unique([tenantId, email])
+}
+
+// =============================================================================
+// Agent + channels
+// =============================================================================
+
+enum AgentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ChannelKind {
+  CHAT
+  VOICE
+  PHONE
+  KIOSK
+}
+
+model Agent {
+  id                  String      @id @default(cuid())
+  tenantId            String
+  tenant              Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name                String
+  slug                String
+  status              AgentStatus @default(DRAFT)
+  policyBundleVersion String
+  language            Language    @default(EN)
+  brandLogoUrl        String?
+  brandColor          String?
+  channels            Channel[]
+  calls               Call[]
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  @@unique([tenantId, slug])
+}
+
+model Channel {
+  id          String      @id @default(cuid())
+  agentId     String
+  agent       Agent       @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  kind        ChannelKind
+  enabled     Boolean     @default(false)
+  phoneNumber String?
+  config      Json?
+  createdAt   DateTime    @default(now())
+
+  @@unique([agentId, kind])
+}
+
+// =============================================================================
+// Calls + audit trail (T11) — the provable trace, NOT raw transcript PHI
+// =============================================================================
+
+model Call {
+  id            String       @id @default(cuid())
+  agentId       String
+  agent         Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  channel       ChannelKind
+  language      Language      @default(EN)
+  // opaque, PHI-free identity handle ONLY — never name/DOB
+  identityRef   String?
+  disposition   String? // final AllowedAction (string-typed; engine owns the enum)
+  startedAt     DateTime      @default(now())
+  endedAt       DateTime?
+  // pointer to a redacted/synthetic transcript store (no-PHI)
+  transcriptRef String?
+  auditEntries  AuditEntry[]
+}
+
+model AuditEntry {
+  id             String   @id @default(cuid())
+  callId         String
+  call           Call     @relation(fields: [callId], references: [id], onDelete: Cascade)
+  seq            Int
+  evidenceJson   Json?
+  redFlagJson    Json?
+  riskJson       Json?
+  decisionJson   Json?
+  bundleVersion  String
+  bundleChecksum String
+  // did the deterministic engine override / dominate the model here?
+  intervention   Boolean  @default(false)
+  ruleIdsFired   String[]
+  createdAt      DateTime @default(now())
+
+  @@index([callId, seq])
+}
+
+// =============================================================================
+// Referral RAG (T12) — advisory only; decision-inert; rejects PHI-shaped content
+// =============================================================================
+
+model ReferralResource {
+  id        String                       @id @default(cuid())
+  tenantId  String
+  tenant    Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  category  String?
+  language  Language                     @default(EN)
+  embedding Unsupported("vector(1536)")?
+  createdAt DateTime                     @default(now())
+}

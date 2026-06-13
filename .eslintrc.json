@@ -1,0 +1,4 @@
+{
+  "extends": ["next/core-web-vitals"],
+  "ignorePatterns": ["terraform/**", "node_modules/**", ".next/**", "evals/**", "db/seed.ts"]
+}

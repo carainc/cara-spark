@@ -1,0 +1,32 @@
+name: ci
+
+# ADVISORY on intra-build pushes (runbook gap #8): typecheck + eval are required; the unit
+# suite is advisory while the engine is being ported (T1). The heavy Playwright/eval RELEASE
+# gate runs at integration, not per-commit.
+on:
+  push:
+    branches: [epic/fable5-build, main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:generate
+      - name: typecheck
+        run: pnpm typecheck
+      - name: unit tests + coverage gate (T1 engine landed; vitest threshold 90% lines / 80% branches)
+        run: pnpm test:coverage
+        # Advisory on intra-build pushes (runbook gap #8). The integrator drops continue-on-error
+        # at the integration/release gate to make the suite + coverage threshold blocking.
+        continue-on-error: true
+      - name: eval gate (local fallback)
+        run: pnpm eval

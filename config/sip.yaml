@@ -1,0 +1,48 @@
+# LiveKit SIP service config — works for BOTH local compose AND the standalone EC2 (T13).
+#
+# THE PROVEN QUIRKS (verified-live on +14157180498 — encode them so adopters don't re-suffer them):
+#   • CODECS: prefer G.711 (PCMU/PCMA). On the proven line, forcing G.711 and DROPPING G.722
+#     fixed "shaky/watery" audio over the public media path. G.711 is narrowband + carrier-safe.
+#     (G.722/OPUS are selectable below, but DEFAULT to G.711 for the standalone EIP media path.)
+#   • JITTER BUFFER: enabled at full probability — smooths RTP over the public internet
+#     (mixer restarts dropped from ~85 → ~16 on the proven box).
+#   • DTMF: RFC 2833 (telephone-event) — the carrier sends DTMF as RTP events, not in-band audio.
+#
+# Telnyx side (NOT in this file — set on the Telnyx connection; see README / live-call checklist):
+#   default_primary_fqdn_id set, DTMF=RFC2833, inbound.codecs forced to [G711U, G711A],
+#   IP-allowlist auth (Telnyx US signaling /24s), FQDN → the EC2 EIP:5060.
+#
+# Keys are env-driven on the box (SIP_API_KEY / SIP_API_SECRET match the LiveKit server keys).
+# The devkey below is a LOCAL-ONLY placeholder (NOT a secret).
+
+api_key: ${SIP_API_KEY}
+api_secret: ${SIP_API_SECRET}
+ws_url: ws://livekit:7880
+
+redis:
+  address: redis:6379
+
+# SIP signaling port (UDP). The EC2 SG opens udp/5060.
+sip_port: 5060
+
+# RTP media port range (UDP). The EC2 SG opens this exact range; keep them in sync.
+rtp_port_range_start: 10000
+rtp_port_range_end: 10100
+
+# DTMF as RFC 2833 telephone-event (matches the Telnyx connection's DTMF mode).
+use_external_dtmf: true
+
+# Jitter buffer ON at full probability — THE audio-smoothing fix for the public media path.
+enable_jitter_buffer: true
+enable_jitter_buffer_prob: 1.0
+
+# Codec preference: G.711 FIRST (PCMU then PCMA). This is the audio-quality fix for the EIP media
+# path — keep G.711 ahead of wideband. G.722/OPUS remain available but are NOT preferred by default.
+audio_codecs:
+  - "PCMU"   # G.711 µ-law (default — carrier-safe, what fixed the proven line)
+  - "PCMA"   # G.711 A-law
+  # - "G722" # wideband — selectable, but caused "watery" audio over the public path; opt-in only
+  # - "OPUS" # selectable for SIP peers that negotiate it; opt-in only
+
+logging:
+  level: info
