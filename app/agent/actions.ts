@@ -122,7 +122,10 @@ export async function submitTurn(req: TurnRequest): Promise<TurnResponse> {
     }
 
     return { ok: true, panel, assistantText, referral };
-  } catch {
+  } catch (err) {
+    // Surface server-side so a misconfig (bad key, rejected model/params) is diagnosable in logs.
+    // The patient still sees only the safe generic error — no internals leak to the browser.
+    console.error('[agent] submitTurn failed:', err instanceof Error ? err.message : err);
     return { ok: false, error: 'turn_failed' };
   }
 }

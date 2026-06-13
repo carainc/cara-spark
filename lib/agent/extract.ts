@@ -10,9 +10,10 @@
  *    NEVER sent. Identity is the opaque { verified, opaqueRef } block from toModelIdentityContext.
  *    The model is also instructed never to ask for identifiers. (Grep-absent test: tests/agent-loop.)
  *
- * Opus 4.8 surface (per the claude-api skill): adaptive thinking only — NO budget_tokens, NO
- * temperature/top_p/top_k (all 400). Structured output via forced tool_choice. The single SDK call
- * is injected (`createMessage`) so vitest mocks it with zero network.
+ * Opus 4.8 surface (per the claude-api skill): structured output via FORCED tool_choice. Extended/
+ * adaptive thinking is INCOMPATIBLE with forced tool use — the API 400s ("Thinking may not be enabled
+ * when tool_choice forces tool use") — so we send NO `thinking`. No temperature/top_p/top_k (Opus 4.8
+ * rejects them). The single SDK call is injected (`createMessage`) so vitest mocks it with zero network.
  */
 import type Anthropic from '@anthropic-ai/sdk';
 import { randomUUID } from 'node:crypto';
@@ -202,12 +203,13 @@ export async function proposeAssessment(args: {
   const system = buildSystemPrompt(lang, identity);
   const messages: Anthropic.MessageParam[] = history.map((t) => ({ role: t.role, content: t.text }));
 
-  // Opus 4.8: adaptive thinking only; forced tool_choice for structured output. No sampling params.
+  // Structured output via FORCED tool_choice. The API forbids extended/adaptive thinking while tool
+  // use is forced ("Thinking may not be enabled when tool_choice forces tool use" → 400), so we send
+  // NO `thinking` here. No sampling params (Opus 4.8 rejects temperature/top_p/top_k).
   const response = await createMessage({
     model: TRIAGE_MODEL,
     max_tokens: 2048,
     system,
-    thinking: { type: 'adaptive' },
     tools: [PROPOSE_TOOL],
     tool_choice: { type: 'tool', name: PROPOSE_TOOL_NAME },
     messages,

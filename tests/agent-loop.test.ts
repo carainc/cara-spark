@@ -207,6 +207,28 @@ describe('model-blindness — no name/DOB ever reaches the assembled model paylo
   });
 });
 
+describe('the model call is API-valid — forced tool_choice WITHOUT thinking (regression: prod 400)', () => {
+  it('forces the propose tool and sends NO `thinking` (the API rejects the combination)', async () => {
+    let captured: Anthropic.MessageCreateParamsNonStreaming | undefined;
+    const create: CreateMessage = vi.fn(async (params) => {
+      captured = params;
+      return fakeMessage(INFANT_FEVER_PROPOSAL);
+    });
+    await proposeAssessment({
+      createMessage: create,
+      lang: 'en',
+      identity: toModelIdentityContext(unverifiedIdentity()),
+      history: [{ role: 'user', text: 'sore throat for a day' }],
+    });
+    // Structured output via forced tool use...
+    expect(captured?.tool_choice).toEqual({ type: 'tool', name: PROPOSE_TOOL_NAME });
+    // ...so `thinking` MUST be absent — the API 400s ("Thinking may not be enabled when tool_choice
+    // forces tool use"), which silently broke every chat turn in prod. This is the regression guard.
+    expect((captured as Record<string, unknown> | undefined)?.thinking).toBeUndefined();
+    expect(captured?.model).toBe(TRIAGE_MODEL);
+  });
+});
+
 describe('parseProposal — defensive parsing of the model tool_use', () => {
   it('throws when the model fails to call the tool (cannot adjudicate without typed evidence)', () => {
     const noTool = {

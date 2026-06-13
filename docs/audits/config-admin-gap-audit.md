@@ -35,3 +35,29 @@ resources upload + call-audit viewer + RAG (T11/T12), super-admin bootstrap (sca
   scaffolded — full verify of invite-ACCEPT (#2), bundle-picker (#1/tk-0017), phone-display (#3)
   DEFERRED until tk-0014/tk-0015/tk-0017 close. Build: 5 closed / 1 claimed. CARA_API_KEY now in `.env`
   (untracked ✓, ignored ✓; no live secret in tracked tree) → Lane C/T5 unblocked.
+- 2026-06-13 — **tk-0015 (T15) closed → re-audit: PASS.** Branded public page
+  (`app/a/[tenant]/[agentSlug]/page.tsx`) + preview (`app/console/agents/[id]/preview/page.tsx`) +
+  `lib/branding/{index,sanitize,store}.ts` built. Sanitization present and the crisis SafetyFooter
+  renders on the branded page → no regression on the footer-everywhere rule. Finding #4 (org-level
+  Tenant settings page for brand + `defaultLanguage`) UNCHANGED — agent-level branding shipped;
+  org-level Tenant settings still has no admin editor (known LOW, deferred; not introduced by T15).
+  No new gap, no regression. Build: 17 closed / 7 open. Remaining config/admin: tk-0014 (auth/creator),
+  tk-0017 (bundle picker).
+- 2026-06-13 — **tk-0017 (T2b, bundle picker) closed → re-audit: PASS — finding #1 (HIGH) RESOLVED.**
+  `GET /api/bundles` (`app/api/bundles/route.ts`, auth-guarded → 401 otherwise) returns version /
+  policyVersion / signedBy / checksum + engine-recomputed checksum & signature validity (real
+  `verifyPolicyBundle`, not a label); read-only, no thresholds exposed. Agent-form selector
+  `app/console/agents/[id]/PolicyBundleForm.tsx` writes `Agent.policyBundleVersion` via
+  `actions.ts` → `lib/auth/{agents,bundle}.ts`. The demo's "pick the triage policy bundle" step is now
+  real config UI and reinforces the signed/verified claim. No new gap. Build: 19 closed / 5 open.
+  Only remaining config/admin ticket: tk-0014 (auth/creator).
+- 2026-06-13 — **tk-0014 (T14, auth/creator) closed → re-audit: PASS — CONFIG/ADMIN AUDIT COMPLETE.**
+  #2 invite-ACCEPT WIRED: `lib/auth.ts` signIn callback → `tryConsumeInviteByToken` → `consumeInvite`
+  attaches the user to the tenant + invited role; accept page `app/invite/[token]/page.tsx`; logic tested.
+  #3 phone DID read-only: agent config page renders the configured DID via `demoPhoneDid()` as a
+  read-only `<p>` (i18n'd) — not an editable/buy-a-number field. Agent CRUD + channel toggles + publish
+  present. No regression.
+  **All 3 substantive findings resolved/verified:** #1 bundle picker (tk-0017), #2 invite-accept (tk-0014),
+  #3 phone display (tk-0014). **LOW deferrals remain (documented, not built):** #4 org/tenant settings page,
+  #5 integration-status endpoint, #6 kiosk device-token admin. All 4 config/admin tickets closed.
+  Monitor STOPPED — remaining open tickets (tk-0010 phone, tk-0013 voice infra) carry no config/admin surface.
