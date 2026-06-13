@@ -28,6 +28,7 @@ import type { ModelIdentityContext } from '@/lib/identity/model-context';
 import type { Lang } from '@/lib/i18n';
 import {
   proposeAssessment,
+  type AgentCustomization,
   type AgentLang,
   type ChatTurn,
   type CreateMessage,
@@ -51,6 +52,13 @@ export interface RunTurnArgs {
    * embedding key) and the referral is simply skipped — the disposition is never affected.
    */
   referral?: ReferralDeps;
+  /**
+   * Optional per-agent TONE/STYLE customization (tk-0015) — persona / extra system-prompt text /
+   * additional instructions. Threaded into the model's system prompt AFTER the hard rules, under a
+   * guardrail. Tone-only by construction: it can shade voice/warmth but can NEVER change the
+   * engine's disposition (the model still only proposes; the engine decides).
+   */
+  custom?: AgentCustomization;
   traceId?: string;
 }
 
@@ -78,6 +86,7 @@ export async function runTurn(args: RunTurnArgs): Promise<RunTurnResult> {
     identity: args.identity,
     history: args.history,
     traceId: args.traceId,
+    custom: args.custom,
   });
 
   // 2) ENGINE DECIDES — deterministic adjudication against the verified bundle. Binding.
@@ -100,5 +109,5 @@ export async function runTurn(args: RunTurnArgs): Promise<RunTurnResult> {
 }
 
 export type { TracePanelView } from './guidance';
-export type { ChatTurn, CreateMessage, AgentLang } from './extract';
+export type { AgentCustomization, ChatTurn, CreateMessage, AgentLang } from './extract';
 export type { ReferralDeps, ReferralRetrieve, ReferralView } from './referral';

@@ -85,6 +85,21 @@ export const en = {
       personaHelp:
         'A short tone note for the conversational voice. It never overrides the engine — the clinical text is always the canned, policy-authored guidance.',
       personaPlaceholder: 'e.g. Warm, plain-language, reassuring; speaks to a worried caregiver.',
+      systemPromptExtraLabel: 'System-prompt addition',
+      systemPromptExtraHelp:
+        'Extra text appended to the model’s system prompt. Tone and style only — it sits behind a guardrail and can never change a disposition, set an urgency, or override the engine.',
+      systemPromptExtraPlaceholder: 'e.g. Use short sentences. Acknowledge the caller’s worry before asking the next question.',
+      additionalInstructionsLabel: 'Additional instructions',
+      additionalInstructionsHelp:
+        'Extra conversational guidance for the voice. Tone and style only — never clinical thresholds, never the next step. The engine still decides everything.',
+      additionalInstructionsPlaceholder: 'e.g. Greet in the caller’s language; avoid medical jargon.',
+      customizationNote:
+        'These tune tone only. The model still just PROPOSES; the deterministic engine makes every clinical decision and these can never override it.',
+      save: 'Save customization',
+      saved: 'Customization saved.',
+      publicLinkLabel: 'Public link',
+      publicLinkHelp: 'This agent is published. Patients can reach it here:',
+      publicLinkDraftNote: 'A public link appears here once this agent is published.',
       readonlyNote: 'Name and slug are set at creation in this build.',
     },
     channels: {

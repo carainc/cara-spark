@@ -146,6 +146,13 @@ model Agent {
   language            Language    @default(EN)
   brandLogoUrl        String?
   brandColor          String?
+  // Agent customization (tk-0015) — TONE/STYLE only. These tune the conversational voice; the
+  // deterministic engine still owns every disposition and they can NEVER override it (appended
+  // AFTER the hard rules under a guardrail line — see lib/agent/extract.ts buildSystemPrompt).
+  // Additive + nullable per the frozen-contract rule.
+  persona                String? // short tone note (e.g. "warm, plain-language, reassuring")
+  systemPromptExtra      String? // extra system-prompt text, appended as STYLE guidance
+  additionalInstructions String? // extra task guidance — also tone/style only, never clinical thresholds
   channels            Channel[]
   calls               Call[]
   createdAt           DateTime    @default(now())

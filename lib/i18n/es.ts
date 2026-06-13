@@ -86,6 +86,21 @@ export const es: Dict = {
       personaHelp:
         'Una breve nota de tono para la voz conversacional. Nunca anula al motor — el texto clínico siempre es la guía predefinida y autorizada por la política.',
       personaPlaceholder: 'p. ej. Cálido, en lenguaje sencillo, tranquilizador; habla con un cuidador preocupado.',
+      systemPromptExtraLabel: 'Adición al sistema',
+      systemPromptExtraHelp:
+        'Texto adicional que se añade al prompt de sistema del modelo. Solo tono y estilo — queda detrás de una barrera y nunca puede cambiar una disposición, fijar una urgencia ni anular al motor.',
+      systemPromptExtraPlaceholder: 'p. ej. Use frases cortas. Reconozca la preocupación de la persona antes de la siguiente pregunta.',
+      additionalInstructionsLabel: 'Instrucciones adicionales',
+      additionalInstructionsHelp:
+        'Guía conversacional adicional para la voz. Solo tono y estilo — nunca umbrales clínicos ni el próximo paso. El motor sigue decidiéndolo todo.',
+      additionalInstructionsPlaceholder: 'p. ej. Salude en el idioma de la persona; evite la jerga médica.',
+      customizationNote:
+        'Esto ajusta solo el tono. El modelo sigue solo PROPONIENDO; el motor determinista toma cada decisión clínica y esto nunca puede anularlo.',
+      save: 'Guardar personalización',
+      saved: 'Personalización guardada.',
+      publicLinkLabel: 'Enlace público',
+      publicLinkHelp: 'Este agente está publicado. Las personas pueden acceder aquí:',
+      publicLinkDraftNote: 'Aquí aparecerá un enlace público una vez que se publique este agente.',
       readonlyNote: 'El nombre y el identificador se definen al crear el agente en esta versión.',
     },
     channels: {

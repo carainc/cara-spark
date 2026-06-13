@@ -5,11 +5,16 @@ import { prisma } from '@/lib/db';
 import { getDict } from '@/lib/i18n';
 import { getLang } from '@/lib/i18n/server';
 import { demoPhoneDid, listPolicyBundles } from '@/lib/auth/bundle';
-import { TOGGLEABLE_CHANNELS } from '@/lib/auth/agents';
+import { TOGGLEABLE_CHANNELS, agentPublicUrl } from '@/lib/auth/agents';
 import { isEmbeddingConfigured } from '@/lib/rag';
 import { getActiveTenantId } from '@/lib/audit/tenant';
 import type { ChannelKind } from '@prisma/client';
-import { configureChannelsAction, publishAgentAction, setPolicyBundleAction } from '../actions';
+import {
+  configureChannelsAction,
+  publishAgentAction,
+  setPolicyBundleAction,
+  updateAgentCustomizationAction,
+} from '../actions';
 import { ResourceForm } from '../../resources/ResourceForm';
 import { AgentTabs } from './AgentTabs';
 import { PolicyBundleForm } from './PolicyBundleForm';
@@ -28,7 +33,10 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
   const session = await auth();
   if (!session?.user) redirect('/login');
 
-  const agent = await prisma.agent.findUnique({ where: { id }, include: { channels: true } });
+  const agent = await prisma.agent.findUnique({
+    where: { id },
+    include: { channels: true, tenant: { select: { slug: true } } },
+  });
   if (!agent || agent.tenantId !== session.user.tenantId) notFound();
 
   const lang = await getLang();
@@ -55,6 +63,14 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
   const configure = configureChannelsAction.bind(null, agent.id);
   const publish = publishAgentAction.bind(null, agent.id);
   const setBundle = setPolicyBundleAction.bind(null, agent.id);
+  const saveCustomization = updateAgentCustomizationAction.bind(null, agent.id);
+
+  // PUBLIC link to the branded page (only meaningful once PUBLISHED). Base is the deploy's public
+  // origin — AUTH_URL (mirrored to NEXTAUTH_URL), defaulting to localhost for self-host/dev. The
+  // route is /a/{tenant}/{agentSlug} (app/a/[tenant]/[agentSlug]).
+  const publicBase = process.env.AUTH_URL || process.env.NEXTAUTH_URL || 'http://localhost:3000';
+  const publicUrl = agentPublicUrl(publicBase, agent.tenant.slug, agent.slug);
+  const isPublished = agent.status === 'PUBLISHED';
 
   const statusLabel =
     agent.status === 'PUBLISHED' ? c.statusPublished : agent.status === 'ARCHIVED' ? c.statusArchived : c.statusDraft;
@@ -84,16 +100,74 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
           </Field>
         </dl>
 
-        <label className="mt-5 block">
-          <span className="field-label">{c.general.personaLabel}</span>
-          <textarea
-            rows={2}
-            disabled
-            placeholder={c.general.personaPlaceholder}
-            className="field cursor-not-allowed opacity-70"
-          />
-          <span className="mt-1.5 block text-stamp text-ink-500">{c.general.personaHelp}</span>
-        </label>
+        {/* PUBLIC link — shown only once PUBLISHED. Clickable + copyable as plain selectable text. */}
+        <div className="mt-5" data-testid="agent-public-link">
+          <span className="field-label">{c.general.publicLinkLabel}</span>
+          {isPublished ? (
+            <>
+              <p className="mt-1 text-stamp text-ink-500">{c.general.publicLinkHelp}</p>
+              <a
+                href={publicUrl}
+                target="_blank"
+                rel="noreferrer"
+                data-testid="agent-public-url"
+                className="mt-1.5 block break-all rounded-card border border-ink-line bg-paper-sunken px-3 py-2 font-mono text-stamp text-brand-700 hover:underline"
+              >
+                {publicUrl}
+              </a>
+            </>
+          ) : (
+            <p className="mt-1 text-stamp text-ink-300">{c.general.publicLinkDraftNote}</p>
+          )}
+        </div>
+
+        {/* Agent customization (tk-0015) — TONE/STYLE only. The honest helper text is kept: these
+            tune tone, the engine still owns every disposition. Saved via a server action. */}
+        <form action={saveCustomization} className="mt-6 space-y-4">
+          <label className="block">
+            <span className="field-label">{c.general.personaLabel}</span>
+            <textarea
+              name="persona"
+              rows={2}
+              defaultValue={agent.persona ?? ''}
+              placeholder={c.general.personaPlaceholder}
+              className="field"
+            />
+            <span className="mt-1.5 block text-stamp text-ink-500">{c.general.personaHelp}</span>
+          </label>
+
+          <label className="block">
+            <span className="field-label">{c.general.systemPromptExtraLabel}</span>
+            <textarea
+              name="systemPromptExtra"
+              rows={3}
+              defaultValue={agent.systemPromptExtra ?? ''}
+              placeholder={c.general.systemPromptExtraPlaceholder}
+              className="field"
+            />
+            <span className="mt-1.5 block text-stamp text-ink-500">{c.general.systemPromptExtraHelp}</span>
+          </label>
+
+          <label className="block">
+            <span className="field-label">{c.general.additionalInstructionsLabel}</span>
+            <textarea
+              name="additionalInstructions"
+              rows={3}
+              defaultValue={agent.additionalInstructions ?? ''}
+              placeholder={c.general.additionalInstructionsPlaceholder}
+              className="field"
+            />
+            <span className="mt-1.5 block text-stamp text-ink-500">{c.general.additionalInstructionsHelp}</span>
+          </label>
+
+          <p className="rounded-card bg-amber-50 px-3 py-2 text-stamp font-medium text-amber-800">
+            {c.general.customizationNote}
+          </p>
+          <button type="submit" className="btn-primary" data-testid="save-customization">
+            {c.general.save}
+          </button>
+        </form>
+
         <p className="mt-3 text-stamp text-ink-300">{c.general.readonlyNote}</p>
       </div>
     ),

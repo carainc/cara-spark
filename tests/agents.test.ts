@@ -4,6 +4,8 @@ import {
   configureChannels,
   publishAgent,
   slugify,
+  updateAgentCustomization,
+  agentPublicUrl,
   type AgentPrisma,
   type AgentRow,
   type ChannelRow,
@@ -140,5 +142,70 @@ describe('agent create → configure → publish persists', () => {
       configureChannels(store.db, { actorRole: undefined, agentId: 'a', channels: { CHAT: true } }),
     ).rejects.toThrow(/forbidden/i);
     await expect(publishAgent(store.db, { actorRole: null, agentId: 'a' })).rejects.toThrow(/forbidden/i);
+  });
+});
+
+describe('agent customization (tk-0015) — persona / extra prompt / additional instructions', () => {
+  let store: ReturnType<typeof makeDb>;
+  beforeEach(() => {
+    store = makeDb();
+  });
+
+  it('saves persona + system-prompt extra + additional instructions on the agent', async () => {
+    const agent = await createAgent(store.db, { actorRole: 'ADMIN', tenantId: TENANT, name: 'Custom' });
+    const updated = await updateAgentCustomization(store.db, {
+      actorRole: 'ADMIN',
+      agentId: agent.id,
+      persona: 'Warm, plain-language, reassuring.',
+      systemPromptExtra: 'Use short sentences.',
+      additionalInstructions: 'Avoid medical jargon.',
+    });
+    expect(updated.persona).toBe('Warm, plain-language, reassuring.');
+    expect(updated.systemPromptExtra).toBe('Use short sentences.');
+    expect(updated.additionalInstructions).toBe('Avoid medical jargon.');
+  });
+
+  it('trims fields and stores an empty/whitespace box as null (cleared → base prompt)', async () => {
+    const agent = await createAgent(store.db, { actorRole: 'ADMIN', tenantId: TENANT, name: 'Trim' });
+    const updated = await updateAgentCustomization(store.db, {
+      actorRole: 'ADMIN',
+      agentId: agent.id,
+      persona: '  spaced  ',
+      systemPromptExtra: '   ',
+      additionalInstructions: '',
+    });
+    expect(updated.persona).toBe('spaced');
+    expect(updated.systemPromptExtra).toBeNull();
+    expect(updated.additionalInstructions).toBeNull();
+  });
+
+  it('is role-guarded — a user with no manage capability cannot customize', async () => {
+    await expect(
+      updateAgentCustomization(store.db, { actorRole: null, agentId: 'a', persona: 'x' }),
+    ).rejects.toThrow(/forbidden/i);
+  });
+});
+
+describe('agentPublicUrl — the published agent’s public /a/<tenant>/<slug> link', () => {
+  it('builds <base>/a/<tenant-slug>/<agent-slug>', () => {
+    expect(agentPublicUrl('https://triage.example.org', 'westside-chc', 'after-hours')).toBe(
+      'https://triage.example.org/a/westside-chc/after-hours',
+    );
+  });
+
+  it('is trailing-slash safe on the base origin', () => {
+    expect(agentPublicUrl('http://localhost:3000/', 'demo', 'intake')).toBe(
+      'http://localhost:3000/a/demo/intake',
+    );
+    expect(agentPublicUrl('http://localhost:3000///', 'demo', 'intake')).toBe(
+      'http://localhost:3000/a/demo/intake',
+    );
+  });
+
+  it('matches the slug a created agent actually gets (round-trip with slugify)', () => {
+    const slug = slugify('After-Hours Triage!');
+    expect(agentPublicUrl('https://app.test', 'clinica-norte', slug)).toBe(
+      'https://app.test/a/clinica-norte/after-hours-triage',
+    );
   });
 });
