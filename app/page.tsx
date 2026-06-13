@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { getDict, getLang } from '@/lib/i18n';
+import { getDict } from '@/lib/i18n';
+import { getLang } from '@/lib/i18n/server';
 
 export default async function Home() {
   const t = getDict(await getLang());

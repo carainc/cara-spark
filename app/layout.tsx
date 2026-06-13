@@ -2,7 +2,8 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import './globals.css';
-import { getDict, getLang } from '@/lib/i18n';
+import { getDict } from '@/lib/i18n';
+import { getLang } from '@/lib/i18n/server';
 import { SafetyFooter } from '@/components/SafetyFooter';
 import { LanguageToggle } from '@/components/LanguageToggle';
 

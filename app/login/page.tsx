@@ -1,5 +1,6 @@
 import { signIn } from '@/lib/auth';
-import { getDict, getLang } from '@/lib/i18n';
+import { getDict } from '@/lib/i18n';
+import { getLang } from '@/lib/i18n/server';
 
 export default async function LoginPage() {
   const t = getDict(await getLang());
