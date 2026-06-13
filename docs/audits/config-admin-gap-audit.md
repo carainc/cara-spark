@@ -27,3 +27,11 @@ resources upload + call-audit viewer + RAG (T11/T12), super-admin bootstrap (sca
 ## Re-audit log (appended by the monitor)
 - 2026-06-13 — initial audit. tk-0017 filed; lane-e.md pins added. Owning lanes (T11/T14/T15/tk-0017)
   still open → nothing to re-verify yet.
+- 2026-06-13 — **tk-0011 (T11) closed → re-audit (config/admin lens): PASS.** Call-audit VIEWER present
+  (`app/console/calls/[id]/page.tsx` + list); call-log PRODUCER / write-path present
+  (`lib/audit/producer.ts` → writes `AuditEntry`); checksum verify present (`lib/audit/verify.ts`).
+  "Call audit viewer = covered" CONFIRMED built; no new config/admin gap, no regression. Console nav
+  wires agents/calls/resources. `app/console/agents/*` (incl. `invite-form.tsx`) + `resources/*` now
+  scaffolded — full verify of invite-ACCEPT (#2), bundle-picker (#1/tk-0017), phone-display (#3)
+  DEFERRED until tk-0014/tk-0015/tk-0017 close. Build: 5 closed / 1 claimed. CARA_API_KEY now in `.env`
+  (untracked ✓, ignored ✓; no live secret in tracked tree) → Lane C/T5 unblocked.
