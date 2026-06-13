@@ -8,7 +8,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-cert
 WORKDIR /app
 
 FROM base AS deps
-COPY package.json pnpm-lock.yaml* ./
+# .npmrc carries node-linker=hoisted so node_modules/.prisma resolves at the top level (run-stage COPY).
+COPY package.json pnpm-lock.yaml* .npmrc ./
 RUN pnpm install --frozen-lockfile || pnpm install
 
 FROM base AS build
