@@ -20,6 +20,9 @@ import {
   evaluateRedFlags,
   runInferenceCheck,
   verifyPolicyBundle,
+  signBundle,
+  verifyBundleSignature,
+  loadPolicyBundle,
 } from '@/engine';
 import type { EvidenceFact, RiskEstimate } from '@/engine/types';
 
@@ -197,5 +200,28 @@ describe('risk + red-flag building blocks (VA-5 parity)', () => {
       DEFAULT_POLICY.redFlagRules,
     );
     expect(rf.hits.some((h) => h.ruleId === 'rf-005')).toBe(true);
+  });
+});
+
+describe('T2 — policy bundle signing (signature verified ✓)', () => {
+  const secret = 'x'.repeat(24); // non-secret, deterministic test HMAC input
+  it('sign → verify round-trips; wrong secret fails', () => {
+    const signed = signBundle(DEFAULT_POLICY, secret);
+    expect(signed.metadata.signature).toMatch(/^[a-f0-9]{64}$/);
+    expect(signed.metadata.signatureAlgorithm).toBe('hmac-sha256');
+    expect(verifyBundleSignature(signed, secret)).toBe(true);
+    expect(verifyBundleSignature(signed, 'wrong-secret')).toBe(false);
+  });
+  it('tampering a signed bundle invalidates the signature', () => {
+    const signed = signBundle(DEFAULT_POLICY, secret);
+    const tampered = { ...signed, redFlagRules: signed.redFlagRules.slice(1) };
+    expect(verifyBundleSignature(tampered, secret)).toBe(false);
+  });
+  it('verifyPolicyBundle(secret) requires a valid signature; loadPolicyBundle gates on it', () => {
+    expect(verifyPolicyBundle(DEFAULT_POLICY, secret).valid).toBe(false); // unsigned → invalid under secret
+    const signed = signBundle(DEFAULT_POLICY, secret);
+    expect(verifyPolicyBundle(signed, secret).valid).toBe(true);
+    expect(() => loadPolicyBundle(DEFAULT_POLICY, secret)).toThrow();
+    expect(loadPolicyBundle(signed, secret)).toBe(signed);
   });
 });

@@ -4,7 +4,7 @@
  * verifyPolicyBundle, and inference-check Check 3 calls verify → a tampered bundle is rejected
  * BEFORE adjudication. T2 (CAR-2363) adds the HMAC signature. Ported from VA-5. Pure — no AI, no DB.
  */
-import { createHash } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import type { PolicyBundle, UrgencyThresholds } from './types';
 import { ALLOWED_ACTIONS, allowedActionSchema } from './types';
 import { DEFAULT_RED_FLAG_RULES } from './redflags';
@@ -91,8 +91,8 @@ export interface BundleVerifyResult {
   errors: string[];
 }
 
-/** T1: checksum + structure. T2 extends with signature verification. */
-export function verifyPolicyBundle(bundle: PolicyBundle): BundleVerifyResult {
+/** T1: checksum + structure. T2: pass `secret` to also require + verify the HMAC signature. */
+export function verifyPolicyBundle(bundle: PolicyBundle, secret?: string): BundleVerifyResult {
   const errors: string[] = [];
   const m = bundle.metadata;
   if (!m?.policyVersion) errors.push('Missing policyVersion');
@@ -113,7 +113,39 @@ export function verifyPolicyBundle(bundle: PolicyBundle): BundleVerifyResult {
   if (!bundle.urgencyThresholds) errors.push('Missing urgencyThresholds');
   if (!Array.isArray(bundle.redFlagRules)) errors.push('redFlagRules is not an array');
 
+  if (secret !== undefined) {
+    if (!bundle.metadata.signature) errors.push('Missing signature');
+    else if (!verifyBundleSignature(bundle, secret)) errors.push('Signature mismatch');
+  }
+
   return { valid: errors.length === 0, errors };
+}
+
+/** T2: sign a bundle — HMAC-SHA256 over its checksum (VOICE_CONFIG_HMAC_SECRET). */
+export function signBundle(bundle: PolicyBundle, secret: string): PolicyBundle {
+  const checksum = bundle.metadata.checksum || computeBundleChecksum(bundle);
+  const signature = createHmac('sha256', secret).update(checksum).digest('hex');
+  return {
+    ...bundle,
+    metadata: { ...bundle.metadata, checksum, signature, signatureAlgorithm: 'hmac-sha256' },
+  };
+}
+
+/** Constant-time verify of the HMAC signature over the (recomputed) checksum. */
+export function verifyBundleSignature(bundle: PolicyBundle, secret: string): boolean {
+  const sig = bundle.metadata.signature;
+  if (!sig || !secret) return false;
+  const expected = createHmac('sha256', secret).update(computeBundleChecksum(bundle)).digest('hex');
+  const a = Buffer.from(sig, 'hex');
+  const b = Buffer.from(expected, 'hex');
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/** The load gate (runbook: a bundle loads only if signature + checksum valid). Throws otherwise. */
+export function loadPolicyBundle(bundle: PolicyBundle, secret: string): PolicyBundle {
+  const v = verifyPolicyBundle(bundle, secret);
+  if (!v.valid) throw new Error(`Refusing to load policy bundle: ${v.errors.join('; ')}`);
+  return bundle;
 }
 
 const DEFAULT_POLICY_BASE: PolicyBundle = {

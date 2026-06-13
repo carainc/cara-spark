@@ -39,8 +39,9 @@ export function adjudicate(input: AdjudicateInput): AdjudicationTrace {
     policyVersion: bundle.metadata.policyVersion,
     checksum: bundle.metadata.checksum,
     checksumValid: verification.valid,
-    // T2 implements real signature verification; absent a signature there is nothing to refute.
-    signatureValid: bundle.metadata.signature ? false : true,
+    // Signature is verified with the secret at LOAD (loadPolicyBundle); the trace reflects that a
+    // signature is present on the bundle the agent loaded. The decision (decide) stays env-free.
+    signatureValid: Boolean(bundle.metadata.signature),
     signedBy: bundle.metadata.signedBy,
   };
 
