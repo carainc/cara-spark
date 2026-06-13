@@ -1,6 +1,6 @@
 #!/bin/bash
 # Cara Spark EC2 bootstrap — clone the public repo, inject .env, docker compose up, Caddy auto-TLS.
-# Terraform fills repo_url/branch/hostname/env_b64 below; shell vars use $NAME (no braces).
+# Terraform fills repo_url/branch/hostname/eip_host/eip/env_b64 below; shell vars use $NAME (no braces).
 set -uxo pipefail
 exec > /var/log/cara-spark-bootstrap.log 2>&1
 echo "[bootstrap] start $(date -u)"
@@ -22,9 +22,20 @@ cd /opt/cara-spark
 echo "${env_b64}" | base64 -d > .env
 HOST="${hostname}"
 EIP_HOST="${eip_host}"
+EIP="${eip}"
 # AUTH_URL is the canonical (spark) host for OAuth callbacks; Caddy also serves the sslip.io host.
 sed -i "s#^AUTH_URL=.*#AUTH_URL=https://$HOST#" .env
 sed -i "s#^NEXTAUTH_URL=.*#NEXTAUTH_URL=https://$HOST#" .env
+
+# THE MEDIA QUIRK (standalone EC2 only): LiveKit must advertise the box's PUBLIC Elastic IP on the
+# RTP/ICE path, or callers hear one-way / no audio behind 1:1 NAT. The compose `livekit` service
+# reads LIVEKIT_NAT_1_TO_1_IP from .env (config/livekit.yaml -> rtc.nat_1_to_1_ip). Set it to the EIP
+# BEFORE `docker compose up` — set-or-append so a missing line (the case on the running box) is fixed.
+if grep -q "^LIVEKIT_NAT_1_TO_1_IP=" .env; then
+  sed -i "s#^LIVEKIT_NAT_1_TO_1_IP=.*#LIVEKIT_NAT_1_TO_1_IP=$EIP#" .env
+else
+  echo "LIVEKIT_NAT_1_TO_1_IP=$EIP" >> .env
+fi
 
 # Bring up the app stack (migrate runs schema+seed, then app starts).
 docker compose up -d --build
