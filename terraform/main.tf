@@ -151,7 +151,10 @@ resource "aws_instance" "this" {
     branch   = var.branch
     hostname = "spark.caramedical.com"
     eip_host = "${aws_eip.this.public_ip}.sslip.io"
-    env_b64  = base64encode(file("${path.module}/../.env"))
+    # The raw Elastic IP — injected into .env as LIVEKIT_NAT_1_TO_1_IP so LiveKit advertises the
+    # public address on the RTP/ICE path (the single-VM 1:1-NAT media quirk). See user_data.sh.tftpl.
+    eip     = aws_eip.this.public_ip
+    env_b64 = base64encode(file("${path.module}/../.env"))
   })
   user_data_replace_on_change = true
 
