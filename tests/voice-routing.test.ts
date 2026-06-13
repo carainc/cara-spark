@@ -6,6 +6,8 @@ import {
   workerNameForAgent,
   roomPrefixFor,
   safeRoutingLog,
+  parseAgentIdFromRoom,
+  resolveConfigAgent,
   type RoutingPrisma,
   type RoutableAgent,
   type RoutableChannel,
@@ -36,6 +38,20 @@ function makeDb(agents: RoutableAgent[]): RoutingPrisma {
               (inSet ? inSet.includes(c.phoneNumber ?? '') : c.phoneNumber === want.phoneNumber),
           );
         });
+      },
+      // `resolveConfigAgent` looks a single agent up by id OR slug (the `OR` form), always
+      // status-gated. Mirror that here against the in-memory set so the resolver is exercised end
+      // to end (the route test mocks the resolver; this exercises the resolver's own DB shape).
+      async findFirst({ where }) {
+        const orFn = (a: RoutableAgent) =>
+          !where?.OR || where.OR.some((c: { id?: string; slug?: string }) => c.id === a.id || c.slug === a.slug);
+        const found = agents.find(
+          (a) =>
+            (!where?.status || a.status === where.status) &&
+            (!where?.id || a.id === where.id) &&
+            orFn(a),
+        );
+        return found ?? null;
       },
     },
   };
@@ -193,7 +209,7 @@ describe('resolveAgentByDid — inbound DID → published agent + dispatch', () 
       channels: [{ kind: 'VOICE', enabled: true, phoneNumber: '+14157185555', config: null }],
     });
     const looseDb: RoutingPrisma = {
-      agent: { async findMany() { return [guarded]; } },
+      agent: { async findMany() { return [guarded]; }, async findFirst() { return null; } },
     };
     const res = await resolveAgentByDid(looseDb, '+14157185555');
     expect(res).toEqual({ matched: false, reason: 'no_match' });
@@ -226,5 +242,98 @@ describe('routing helpers', () => {
 
   it('safeRoutingLog surfaces only the reason — unmatched', () => {
     expect(safeRoutingLog({ matched: false, reason: 'no_match' })).toEqual({ matched: false, reason: 'no_match' });
+  });
+});
+
+// ---- tk-0026: the Spark→prod-voice config bridge -------------------------------------------
+
+describe('parseAgentIdFromRoom — accepts both Spark and prod room shapes', () => {
+  it('parses the Spark mint shape voicephone-<agentId>-<suffix>', () => {
+    expect(parseAgentIdFromRoom('voicephone-agent_1-room5')).toBe('agent_1');
+    // a cuid carries no hyphen, so the 2nd segment is the whole agentId
+    expect(parseAgentIdFromRoom('voicephone-clh2x9k0000abcd-abc123')).toBe('clh2x9k0000abcd');
+  });
+  it('parses the prod mint shape call-<tenantId>-<agentId>', () => {
+    expect(parseAgentIdFromRoom('call-tenant_9-agent_7')).toBe('agent_7');
+    expect(parseAgentIdFromRoom('call-clT3nant-clAg3nt')).toBe('clAg3nt');
+  });
+  it('returns null for an unrecognized / empty room (caller then falls back or fails closed)', () => {
+    expect(parseAgentIdFromRoom('lobby')).toBeNull();
+    expect(parseAgentIdFromRoom('')).toBeNull();
+    expect(parseAgentIdFromRoom(null)).toBeNull();
+    expect(parseAgentIdFromRoom(undefined)).toBeNull();
+    expect(parseAgentIdFromRoom('voicephone-')).toBeNull(); // no agentId segment
+  });
+});
+
+describe('resolveConfigAgent — per-call config inputs → published agent (fail-closed)', () => {
+  // A published agent that also carries tk-0015 tone fields. NOTE: `resolveConfigAgent` selects the
+  // raw `Agent.language`, which is the Prisma `Language` enum (EN/ES, UPPERCASE) — so the row this
+  // double returns must mirror that (the dispatch-time RoutableAgent uses lowercase, but the
+  // config-time select reads the real enum). `toConfigAgent` lowercases it.
+  const withTone = (over: Partial<RoutableAgent> = {}, tone: Record<string, string | null> = {}) =>
+    ({
+      ...agent(over),
+      language: (over.language ?? 'en').toUpperCase(),
+      persona: tone.persona ?? null,
+      systemPromptExtra: tone.systemPromptExtra ?? null,
+      additionalInstructions: tone.additionalInstructions ?? null,
+    }) as RoutableAgent;
+
+  const pub = withTone(
+    { id: 'agent_1', slug: 'after-hours-triage', channels: [phone('+14157180498')] },
+    { persona: 'warm and reassuring' },
+  );
+
+  it('resolves by the agentId parsed from a Spark room (PUBLISHED)', async () => {
+    const res = await resolveConfigAgent(makeDb([pub]), { room: 'voicephone-agent_1-r5' });
+    expect(res).not.toBeNull();
+    expect(res?.id).toBe('agent_1');
+    expect(res?.language).toBe('en');
+    expect(res?.persona).toBe('warm and reassuring');
+  });
+
+  it('resolves by the agentId parsed from a PROD room (call-<tenant>-<agent>)', async () => {
+    const res = await resolveConfigAgent(makeDb([pub]), { room: 'call-tenantX-agent_1' });
+    expect(res?.id).toBe('agent_1');
+  });
+
+  it('resolves by dialed DID when the room does not parse', async () => {
+    const res = await resolveConfigAgent(makeDb([pub]), { room: 'lobby', did: '+14157180498' });
+    expect(res?.id).toBe('agent_1');
+  });
+
+  it('resolves by agentRef as a slug when room+did miss', async () => {
+    const res = await resolveConfigAgent(makeDb([pub]), { room: 'lobby', agentRef: 'after-hours-triage' });
+    expect(res?.id).toBe('agent_1');
+  });
+
+  it('resolves by agentRef as an agentId too', async () => {
+    const res = await resolveConfigAgent(makeDb([pub]), { agentRef: 'agent_1' });
+    expect(res?.id).toBe('agent_1');
+  });
+
+  it('maps an ES agent to language "es"', async () => {
+    const es = withTone({ id: 'agent_es', slug: 'spanish-line', language: 'es', channels: [phone('+14155550000')] });
+    const res = await resolveConfigAgent(makeDb([es]), { room: 'voicephone-agent_es-r1' });
+    expect(res?.language).toBe('es');
+  });
+
+  it('FAILS CLOSED (null) for an unknown agent — no room/did/ref matches', async () => {
+    const res = await resolveConfigAgent(makeDb([pub]), { room: 'voicephone-nope-r1', did: '+19998887777', agentRef: 'ghost' });
+    expect(res).toBeNull();
+  });
+
+  it('FAILS CLOSED (null) for a DRAFT agent — only PUBLISHED is served', async () => {
+    const draft = withTone({ id: 'agent_draft', slug: 'draft-one', status: 'DRAFT' });
+    const res = await resolveConfigAgent(makeDb([draft]), { room: 'voicephone-agent_draft-r1' });
+    expect(res).toBeNull();
+    // and not via agentRef either
+    expect(await resolveConfigAgent(makeDb([draft]), { agentRef: 'draft-one' })).toBeNull();
+  });
+
+  it('FAILS CLOSED (null) for an ARCHIVED agent', async () => {
+    const arch = withTone({ id: 'agent_arch', slug: 'arch-one', status: 'ARCHIVED' });
+    expect(await resolveConfigAgent(makeDb([arch]), { room: 'voicephone-agent_arch-r1' })).toBeNull();
   });
 });
