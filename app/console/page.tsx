@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { auth, signOut } from '@/lib/auth';
 import { getDict } from '@/lib/i18n';
 import { getLang } from '@/lib/i18n/server';
@@ -15,8 +16,14 @@ export default async function ConsolePage() {
         {role === 'SUPER_ADMIN' ? t.console.superAdmin : role}
       </p>
       <p className="mt-6 text-gray-700">
-        Cara Spark console — agent creation, channels, and invites land here (Lane E / T14).
+        Cara Spark console — create triage agents, pick channels, and invite teammates.
       </p>
+      <Link
+        href="/console/agents"
+        className="mt-4 inline-block rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800"
+      >
+        {t.console.createAgent}
+      </Link>
       <form
         action={async () => {
           'use server';
