@@ -13,7 +13,7 @@ import {
   type SignableVoiceConfig,
 } from '@/lib/voice/config-signature';
 
-const SECRET = 'test-hmac-secret-do-not-use-in-prod';
+const SECRET = 'x'.repeat(32); // non-key-shaped HMAC input for tests
 
 const cfg: SignableVoiceConfig = {
   agentId: 'agent-123',

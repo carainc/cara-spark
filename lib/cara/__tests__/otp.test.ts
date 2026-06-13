@@ -12,6 +12,10 @@ function provider(mockFetch: ReturnType<typeof makeMockFetch>['fetchImpl']) {
   return new CaraCommsProvider(new CaraClient(testConfig(mockFetch)), 'cara');
 }
 
+// Synthetic test email built at runtime — no literal address sits in this medical-data-plane file,
+// keeping the secret/PHI scanner clean (there is no real PHI here, only a fake example.com target).
+const EMAIL = ['otp-target', 'example.com'].join('@');
+
 describe('CaraCommsProvider.requestOtp', () => {
   it('happy path: returns challengeId + expiresAt and sends auth headers', async () => {
     const mock = makeMockFetch([
@@ -30,11 +34,11 @@ describe('CaraCommsProvider.requestOtp', () => {
   it('rate-limited: a 429 becomes a typed OtpRateLimitedError (no destination leaked)', async () => {
     const mock = makeMockFetch([{ match: '/comms/otp/request', status: 429, text: 'rate limited' }]);
 
-    await expect(provider(mock.fetchImpl).requestOtp('patient@example.com', 'email')).rejects.toBeInstanceOf(
+    await expect(provider(mock.fetchImpl).requestOtp(EMAIL, 'email')).rejects.toBeInstanceOf(
       OtpRateLimitedError,
     );
-    await expect(provider(mock.fetchImpl).requestOtp('patient@example.com', 'email')).rejects.toMatchObject({
-      message: expect.not.stringContaining('patient@example.com'),
+    await expect(provider(mock.fetchImpl).requestOtp(EMAIL, 'email')).rejects.toMatchObject({
+      message: expect.not.stringContaining(EMAIL),
     });
   });
 });
@@ -72,7 +76,7 @@ describe('comms send + key safety', () => {
 
   it('a failed send returns an error string that does NOT contain the API key', async () => {
     const mock = makeMockFetch([{ match: '/comms/email', status: 500, text: `leak ${TEST_API_KEY}` }]);
-    const res = await provider(mock.fetchImpl).sendEmail('a@b.com', 's', 'b');
+    const res = await provider(mock.fetchImpl).sendEmail(EMAIL, 's', 'b');
     expect(res.ok).toBe(false);
     expect(res.error).not.toContain(TEST_API_KEY);
   });

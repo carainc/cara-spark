@@ -18,7 +18,7 @@ import { signConfig, type SignableVoiceConfig } from '@/lib/voice/config-signatu
 import type { VoiceAgentRegistration, PostCallResult, VoicePolicyDecisionRequest } from '@/lib/voice/types';
 import type { AdjudicationTrace, EvidenceFact, RiskEstimate } from '@/engine/types';
 
-const SECRET = 'gateway-unit-secret';
+const SECRET = 'x'.repeat(24); // non-key-shaped HMAC input for tests
 
 function makeRegistration(over: Partial<VoiceAgentRegistration> = {}): VoiceAgentRegistration {
   const base = {
