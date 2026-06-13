@@ -12,9 +12,9 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'text-summary', 'json-summary', 'html'],
       reportsDirectory: './coverage',
-      // The unit-testable core. UI (.tsx) is Playwright-e2e territory; lib/rag/pg-store.ts is the
-      // pgvector integration boundary (a DB-backed test is ticketed, not unit-mockable); lib/auth.ts
-      // and lib/db.ts are framework/config wiring.
+      // The unit-testable core. UI (.tsx) is Playwright-e2e territory; lib/auth.ts and lib/db.ts are
+      // framework/config wiring. The RAG IO boundaries (pg-store/embeddings) are covered via injected
+      // doubles (tk-0021) and are now enforced.
       include: ['engine/**/*.ts', 'lib/**/*.ts', 'app/api/**/*.ts'],
       exclude: [
         '**/*.test.ts',
@@ -24,9 +24,7 @@ export default defineConfig({
         'lib/i18n/**',
         'lib/db.ts',
         'lib/auth.ts',
-        // External-IO boundaries — covered by a ticketed DB/network integration test, not unit mocks:
-        'lib/rag/pg-store.ts', // pgvector raw SQL
-        'lib/rag/embeddings.ts', // BYO-key embedding HTTP calls
+        // External-IO boundary — framework wiring, not unit-mockable:
         'app/api/auth/**', // NextAuth handler re-export (framework wiring)
       ],
       // A regression floor, set comfortably below current (94% lines / 85% branches) so it
