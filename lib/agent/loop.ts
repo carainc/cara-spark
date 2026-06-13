@@ -103,6 +103,9 @@ export async function runTurn(args: RunTurnArgs): Promise<RunTurnResult> {
   //    input, and returns decoration or null. For emergency dispositions it returns null (emergency
   //    first); on any RAG failure it degrades to null. It is structurally incapable of changing the
   //    action: it never feeds back into `adjudicate` and never writes `trace`/`panel.action`.
+  //    tk-0027: a SDOH social-needs request lands on SELF_CARE_INFO_ONLY (engine lane), which is
+  //    referral-eligible — so a pure "I'm looking for food" surfaces the community food-bank resource
+  //    here, still decision-inert.
   const referral = await maybeBuildReferral(trace, args.lang, args.referral);
 
   return { trace, panel, assistantText: proposal.assistantText, referral };
