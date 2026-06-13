@@ -6,6 +6,8 @@ import {
   DEFAULT_POLICY_BUNDLE_VERSION,
 } from '@/lib/auth/bundle';
 import { setAgentPolicyBundle, type AgentPrisma, type AgentRow } from '@/lib/auth/agents';
+import { getRegisteredBundle } from '@/engine';
+import { resolveBundle } from '@/lib/audit/bundle-resolver';
 
 /**
  * tk-0017 / tk-0022 — the SIGNED policy-bundle catalog + selector. The bundle is the safety
@@ -18,15 +20,27 @@ describe('listPolicyBundles — surfaces the signed default with engine-verified
     delete process.env.VOICE_CONFIG_HMAC_SECRET;
   });
 
-  it('returns the default bundle under the DB version string', () => {
+  it('returns the default bundle (first) under the DB version string', () => {
     const bundles = listPolicyBundles();
-    expect(bundles).toHaveLength(1);
+    // tk-0025: the catalog now ships the default AND the signed familymed-v1 bundle.
+    expect(bundles.length).toBeGreaterThanOrEqual(2);
     const b = bundles[0];
     expect(b.version).toBe(DEFAULT_POLICY_BUNDLE_VERSION);
     expect(b.isDefault).toBe(true);
     // policyVersion is the engine's internal metadata version (distinct from the DB label).
     expect(b.policyVersion).toBe('1.0.0');
     expect(b.signedBy).toBe('cara-spark-default');
+  });
+
+  it('surfaces the familymed-v1 bundle with engine-verified, real metadata (tk-0025)', () => {
+    const fm = listPolicyBundles().find((b) => b.version === 'familymed-v1');
+    expect(fm).toBeDefined();
+    expect(fm!.isDefault).toBe(false);
+    expect(fm!.policyVersion).toBe('familymed-v1');
+    expect(fm!.signedBy).toBe('Michael Hobbs, MD');
+    expect(fm!.checksum).toMatch(/^[0-9a-f]{16,}$/i);
+    expect(fm!.checksumValid).toBe(true);
+    expect(fm!.redFlagRules.length).toBeGreaterThan(0);
   });
 
   it('reports a valid checksum and a real (non-empty) checksum value', () => {
@@ -51,6 +65,28 @@ describe('listPolicyBundles — surfaces the signed default with engine-verified
     expect(listPolicyBundles()[0].signatureValid).toBe(false);
     process.env.VOICE_CONFIG_HMAC_SECRET = 'unit-test-hmac-fixture';
     expect(listPolicyBundles()[0].signatureValid).toBe(true);
+  });
+});
+
+describe('familymed-v1 registry resolution (the seam the seed + loop + audit re-verify rely on, tk-0025)', () => {
+  it('is a KNOWN bundle version — so the seed write + console selector accept it (fail-closed elsewhere)', () => {
+    expect(isKnownBundleVersion('familymed-v1')).toBe(true);
+  });
+
+  it('getRegisteredBundle resolves familymed-v1; an unknown version resolves to null (loop then falls back)', () => {
+    const fm = getRegisteredBundle('familymed-v1');
+    expect(fm).not.toBeNull();
+    expect(fm!.metadata.policyVersion).toBe('familymed-v1');
+    expect(fm!.redFlagRules.length).toBeGreaterThan(0);
+    // The fallback contract resolveAgentBundle() depends on: unknown → null → activePolicyBundle().
+    expect(getRegisteredBundle('totally-made-up')).toBeNull();
+    expect(getRegisteredBundle('')).toBeNull();
+  });
+
+  it('the audit viewer can RE-VERIFY a familymed-recorded decision by its policyVersion', () => {
+    const fm = resolveBundle('familymed-v1');
+    expect(fm).not.toBeNull();
+    expect(fm!.metadata.policyVersion).toBe('familymed-v1');
   });
 });
 
@@ -139,8 +175,10 @@ describe('GET /api/bundles — session-guarded read of the bundle catalog', () =
     const res = await GET();
     expect(res.status).toBe(200);
     const body = (await res.json()) as { bundles: { version: string; checksumValid: boolean }[] };
-    expect(body.bundles).toHaveLength(1);
+    // The catalog ships the default + familymed-v1 (tk-0025), default first and verified.
+    expect(body.bundles.length).toBeGreaterThanOrEqual(2);
     expect(body.bundles[0].version).toBe(DEFAULT_POLICY_BUNDLE_VERSION);
     expect(body.bundles[0].checksumValid).toBe(true);
+    expect(body.bundles.some((b) => b.version === 'familymed-v1' && b.checksumValid)).toBe(true);
   });
 });

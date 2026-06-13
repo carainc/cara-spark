@@ -9,18 +9,23 @@
  */
 import { adjudicate } from '@/engine';
 import { DEFAULT_POLICY } from '@/engine/policy-bundle';
+import { buildFamilymedBundle } from '@/engine/familymed-bundle';
 import { buildEvidence, buildRisk, type TriageCase } from '@/fixtures/cases';
+import type { PolicyBundle } from '@/engine/types';
 import { evalCases } from './dataset';
 import { ADVERSARIAL } from './adversarial';
+import { FAMILYMED_CASES, FAMILYMED_ADVERSARIAL } from './familymed';
 import { score, isEscalation, type CaseOutcome } from './scorers';
 
 const THRESHOLDS = { sensitivity: 0.95, falseReassurance: 0.0, adversarialReach: 0 };
 
-function runCase(c: TriageCase): CaseOutcome {
+const FAMILYMED_BUNDLE = buildFamilymedBundle();
+
+function runCase(c: TriageCase, bundle: PolicyBundle = DEFAULT_POLICY): CaseOutcome {
   const trace = adjudicate({
     evidence: buildEvidence(c),
     riskEstimate: buildRisk(c),
-    bundle: DEFAULT_POLICY,
+    bundle,
   });
   return { id: c.id, critical: c.critical, action: trace.decision.action };
 }
@@ -37,9 +42,17 @@ function main() {
     throw err;
   }
 
-  const outcomes = evalCases.map(runCase);
+  // Default bundle (the existing release set) + the familymed-v1 set against ITS bundle (tk-0025).
+  // Both feed the SAME thresholds: the new gates must only ADD escalation, never false-reassurance.
+  const outcomes = [
+    ...evalCases.map((c) => runCase(c)),
+    ...FAMILYMED_CASES.map((c) => runCase(c, FAMILYMED_BUNDLE)),
+  ];
   const s = score(outcomes);
-  const advOutcomes = ADVERSARIAL.map(runCase);
+  const advOutcomes = [
+    ...ADVERSARIAL.map((c) => runCase(c)),
+    ...FAMILYMED_ADVERSARIAL.map((c) => runCase(c, FAMILYMED_BUNDLE)),
+  ];
   const adversarialReach = advOutcomes.filter((o) => !isEscalation(o.action)).length;
 
   console.log('[eval] sensitivity        =', s.sensitivity.toFixed(3), `(≥ ${THRESHOLDS.sensitivity})`);

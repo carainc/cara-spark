@@ -10,10 +10,10 @@
  *     the +14157180498 fallback rung. The value is sourced from DEMO_PHONE_DID so the prod number
  *     is never the only source and is never WRITTEN by this app (prod voice isolation, AGENTS §7).
  */
-import { activePolicyBundle, verifyPolicyBundle } from '@/engine';
+import { listRegisteredBundles, verifyPolicyBundle, DEFAULT_BUNDLE_VERSION } from '@/engine';
 
 /** The signed DEFAULT policy bundle version (mirrors db/seed.ts + the engine's default bundle). */
-export const DEFAULT_POLICY_BUNDLE_VERSION = 'default-0.1.0';
+export const DEFAULT_POLICY_BUNDLE_VERSION = DEFAULT_BUNDLE_VERSION;
 
 /** Human label for the (currently fixed) bundle selection — the "verified" badge the demo shows. */
 export function bundleVerifiedLabel(version: string = DEFAULT_POLICY_BUNDLE_VERSION): string {
@@ -40,32 +40,33 @@ export interface BundleSummary {
 }
 
 /**
- * The available policy bundles for the selector. This build ships exactly ONE signed bundle (the
- * engine default), surfaced under the DB version string `default-0.1.0`. The checksum + signature
- * are read live from the engine's `activePolicyBundle()` (signed when VOICE_CONFIG_HMAC_SECRET is
- * set), and verified with `verifyPolicyBundle` so the "verified ✓" claim is real, not decorative.
+ * The available policy bundles for the selector — read live from the ENGINE'S registry
+ * (`listRegisteredBundles`). This build ships the signed engine default (`default-0.1.0`) plus the
+ * signed `familymed-v1` family-medicine bundle (tk-0025). Each bundle's checksum + signature come
+ * from its own builder (signed when VOICE_CONFIG_HMAC_SECRET is set) and are verified with
+ * `verifyPolicyBundle` so the "verified ✓" claim is real, not decorative.
  *
- * Pure read: no DB, no mutation. Returning an array keeps the API + UI ready for additional signed
- * bundles without a shape change.
+ * Pure read: no DB, no mutation. Driven by the registry so a newly registered bundle appears here
+ * (and therefore in GET /api/bundles + the console Policies tab) without a shape change.
  */
 export function listPolicyBundles(): BundleSummary[] {
-  const bundle = activePolicyBundle();
   const secret = process.env.VOICE_CONFIG_HMAC_SECRET;
-  // Verify WITH the secret only when one is configured (so signatureValid reflects reality);
-  // structure + checksum are always verified.
-  const verification = verifyPolicyBundle(bundle, secret || undefined);
-  return [
-    {
-      version: DEFAULT_POLICY_BUNDLE_VERSION,
+  return listRegisteredBundles().map((entry) => {
+    const bundle = entry.build();
+    // Verify WITH the secret only when one is configured (so signatureValid reflects reality);
+    // structure + checksum are always verified.
+    const verification = verifyPolicyBundle(bundle, secret || undefined);
+    return {
+      version: entry.version,
       policyVersion: bundle.metadata.policyVersion,
       signedBy: bundle.metadata.signedBy,
       checksum: bundle.metadata.checksum,
       checksumValid: verification.valid || !verification.errors.some((e) => e.startsWith('Checksum')),
       signatureValid: Boolean(bundle.metadata.signature) && verification.valid,
-      isDefault: true,
+      isDefault: entry.isDefault,
       redFlagRules: bundle.redFlagRules.map((r) => ({ id: r.id, name: r.name, action: r.action })),
-    },
-  ];
+    };
+  });
 }
 
 /** Whether a candidate version string is one of the available (selectable) bundle versions. */

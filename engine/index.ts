@@ -7,9 +7,22 @@ import type { AdjudicateInput, AdjudicationTrace, BundleVerification, PolicyDeci
 import { evaluateRedFlags } from './redflags';
 import { decide } from './policy';
 import { runInferenceCheck } from './inference-check';
-import { verifyBundleSignature, verifyPolicyBundle } from './policy-bundle';
+import { verifyBundleSignature, verifyPolicyBundle, registerBundle } from './policy-bundle';
+import { FAMILYMED_BUNDLE_VERSION, activeFamilymedBundle, FAMILYMED_BUNDLE_METADATA } from './familymed-bundle';
 
 export const ENGINE_VERSION = '1.0.0';
+
+// Register the familymed-v1 bundle (tk-0025) at module load so every consumer of the registry
+// (GET /api/bundles, the audit re-verify resolver, the loop's per-agent resolution) sees it. Done
+// here — not in policy-bundle.ts — because familymed-bundle.ts imports the create/sign helpers from
+// policy-bundle.ts, so registering there would be a cycle.
+registerBundle({
+  version: FAMILYMED_BUNDLE_VERSION,
+  build: activeFamilymedBundle,
+  isDefault: false,
+  author: FAMILYMED_BUNDLE_METADATA.author,
+  source: FAMILYMED_BUNDLE_METADATA.source,
+});
 
 /** fail-closed reason surfaced when a bundle claims a signature that does not verify (tk-0020). */
 const SIGNATURE_INVALID_REASON = 'policy bundle signature invalid — fail-closed; not adjudicated';
@@ -105,3 +118,4 @@ export * from './policy';
 export * from './inference-check';
 export * from './workflow';
 export * from './policy-bundle';
+export * from './familymed-bundle';
