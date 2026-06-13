@@ -33,13 +33,13 @@ Always reconcile "what's next" against `took task ready` ∩ runbook §2 lanes.
 - **done:** _none_   ·   **in-progress:** _none_   ·   **parked:** _none_
 
 ## Open human-gates (G0 — the only hard blocker)
-- ⏸ **AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET** — not yet provided. Parks T14 auth-login only;
-  all other lanes proceed. Ask: paste both, or say "park T14 login".
-- ⏸ **AWS_REGION** — confirm (default candidate: us-east-1). Needed before `terraform apply`.
-- ⏸ **ANTHROPIC credit confirm** — confirm (Console → Billing) that the org owning
-  `ANTHROPIC_API_KEY` (sk-ant-api03-…) holds the Build-Day promo credits before heavy runs.
+- ⏸ **AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET** — IN PROGRESS (creating the Google OAuth web
+  client). Last open gate. Parks only T14 auth-login; all other lanes proceed. On receipt:
+  store in `~/.claude/voice-run.env`, generate `AUTH_SECRET`, clear this gate.
+- ✅ AWS_REGION = us-east-1 (confirmed)
+- ✅ ANTHROPIC credits confirmed — org holding ANTHROPIC_API_KEY has the Build-Day promo credits
 - ✅ GITHUB_REPO = github.com/carainc/cara-spark (origin set)
-- ✅ SUPERADMIN_EMAIL = nils@caramedical.com (confirm or change)
+- ✅ SUPERADMIN_EMAIL = nils@caramedical.com
 - ✅ AWS_PROFILE = cara-prod
 
 ## Secrets source
