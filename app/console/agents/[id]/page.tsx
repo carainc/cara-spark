@@ -40,13 +40,19 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
       </Link>
       <div className="mt-2 flex items-center justify-between">
         <h1 className="text-2xl font-bold">{agent.name}</h1>
-        <span
-          className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-            agent.status === 'PUBLISHED' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
-          }`}
-        >
-          {agent.status}
-        </span>
+        <div className="flex items-center gap-3">
+          {/* Lane D / T15: preview the branded page (works for a DRAFT) before publishing. */}
+          <Link href={`/console/agents/${agent.id}/preview`} className="text-sm text-brand hover:underline">
+            Preview
+          </Link>
+          <span
+            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+              agent.status === 'PUBLISHED' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+            }`}
+          >
+            {agent.status}
+          </span>
+        </div>
       </div>
 
       <div className="mt-4 rounded-md bg-gray-50 p-3 text-sm">
