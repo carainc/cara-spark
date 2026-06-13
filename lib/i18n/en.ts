@@ -20,6 +20,10 @@ export const en = {
     title: 'Sign in',
     google: 'Continue with Google',
     note: 'The first person to sign in becomes the super-admin and invites the rest.',
+    or: 'or',
+    email: 'Email',
+    password: 'Password',
+    passwordSignIn: 'Sign in with email',
   },
   console: {
     welcome: 'Welcome',

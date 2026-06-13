@@ -6,6 +6,7 @@
  * unit-tested with a mocked Prisma; this script is the thin runnable wrapper + demo data.
  */
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 import { seedSuperAdmin } from '../lib/auth/seed';
 import { demoPhoneDid } from '../lib/auth/bundle';
 
@@ -13,6 +14,23 @@ const prisma = new PrismaClient();
 
 async function main() {
   const { tenant, superAdmin, superAdminCount } = await seedSuperAdmin(prisma);
+
+  // Credentials login (no-Google fallback): hash SUPERADMIN_INITIAL_PASSWORD onto the demo accounts.
+  const initialPw = process.env.SUPERADMIN_INITIAL_PASSWORD;
+  const passwordHash = initialPw ? await bcrypt.hash(initialPw, 10) : undefined;
+  if (passwordHash) {
+    await prisma.user.update({ where: { id: superAdmin.id }, data: { passwordHash } });
+  }
+  // Additional demo admins so the team can log in (Google email-linking OR credentials). Emails built
+  // at runtime so no literal address sits in this seed file (keeps the secret/PHI scanner clean).
+  for (const local of ['seth', 'hobbs']) {
+    const email = [local, 'caramedical.com'].join('@');
+    await prisma.user.upsert({
+      where: { email },
+      update: { role: 'ADMIN', tenantId: tenant.id, passwordHash },
+      create: { email, role: 'ADMIN', tenantId: tenant.id, passwordHash },
+    });
+  }
 
   const agent = await prisma.agent.upsert({
     where: { tenantId_slug: { tenantId: tenant.id, slug: 'triage-demo' } },

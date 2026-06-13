@@ -1,6 +1,8 @@
 import { cookies } from 'next/headers';
 import NextAuth from 'next-auth';
 import Google from 'next-auth/providers/google';
+import Credentials from 'next-auth/providers/credentials';
+import bcrypt from 'bcryptjs';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import type { Role } from '@prisma/client';
 import { prisma } from '@/lib/db';
@@ -28,7 +30,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
   trustHost: true,
   session: { strategy: 'jwt' },
-  providers: [Google],
+  providers: [
+    // Google verifies emails, so auto-linking a Google sign-in to a seeded/invited email user is safe
+    // here — avoids OAuthAccountNotLinked when the super-admin/invitees were seeded by email.
+    Google({ allowDangerousEmailAccountLinking: true }),
+    // Email + password (no-Google fallback + self-host friendly). The user must already exist with a
+    // passwordHash (seeded super-admin/admins); bcrypt-compared. Pure JWT — no adapter session.
+    Credentials({
+      name: 'Email and password',
+      credentials: { email: {}, password: {} },
+      async authorize(creds) {
+        const email = String(creds?.email ?? '').trim().toLowerCase();
+        const password = String(creds?.password ?? '');
+        if (!email || !password) return null;
+        const user = await prisma.user.findUnique({ where: { email } });
+        if (!user?.passwordHash) return null;
+        const ok = await bcrypt.compare(password, user.passwordHash);
+        return ok ? { id: user.id, email: user.email, name: user.name ?? undefined } : null;
+      },
+    }),
+  ],
   pages: { signIn: '/login' },
   callbacks: {
     // Runs after the Google account is linked (PrismaAdapter has created/looked up the User).

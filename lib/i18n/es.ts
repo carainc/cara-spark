@@ -22,6 +22,10 @@ export const es: Dict = {
     title: 'Iniciar sesión',
     google: 'Continuar con Google',
     note: 'La primera persona que inicie sesión será el super-administrador e invitará al resto.',
+    or: 'o',
+    email: 'Correo electrónico',
+    password: 'Contraseña',
+    passwordSignIn: 'Iniciar sesión con correo',
   },
   console: {
     welcome: 'Bienvenido',
