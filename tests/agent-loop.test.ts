@@ -85,8 +85,11 @@ describe('the tool the model is forced to call', () => {
     const schema = PROPOSE_TOOL.input_schema as {
       properties: Record<string, { properties?: Record<string, unknown> }>;
     };
-    // Top-level fields are evidence + risk ONLY — there is no `action`/`disposition` field to fill.
-    expect(Object.keys(schema.properties).sort()).toEqual(['evidence', 'risk']);
+    // Top-level fields are evidence + risk + the tone-only conversational `reply` — there is still NO
+    // `action`/`disposition` field the model can fill (the engine decides; reply is never the decision).
+    expect(Object.keys(schema.properties).sort()).toEqual(['evidence', 'reply', 'risk']);
+    expect(Object.keys(schema.properties)).not.toContain('action');
+    expect(Object.keys(schema.properties)).not.toContain('disposition');
     // Nor is there one nested inside the risk object.
     const riskFields = Object.keys(schema.properties.risk.properties ?? {});
     expect(riskFields).not.toContain('action');

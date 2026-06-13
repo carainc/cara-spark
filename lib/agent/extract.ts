@@ -108,8 +108,18 @@ export const PROPOSE_TOOL: Anthropic.Tool = {
           'reasonCodes',
         ],
       },
+      reply: {
+        type: 'string',
+        description:
+          "Your short, warm conversational reply to the patient, in THEIR language. Acknowledge what " +
+          "they said, then ask the SINGLE most useful next question (one at a time, Schmitt-Thompson " +
+          "style — build on what they've already told you). If you already have enough to hand off, " +
+          'give a brief kind closing line. NEVER state or imply a disposition, urgency, triage level, ' +
+          'or whether this is / is not an emergency — a separate deterministic engine decides that and ' +
+          'writes the clinical guidance shown to the patient.',
+      },
     },
-    required: ['evidence', 'risk'],
+    required: ['evidence', 'risk', 'reply'],
   },
 };
 
@@ -128,6 +138,10 @@ const proposedRiskSchema = riskEstimateSchema.omit({ modelVersion: true }).exten
 const proposeInputSchema = z.object({
   evidence: z.array(proposedEvidenceItemSchema),
   risk: proposedRiskSchema,
+  // The model's conversational turn to the patient (acknowledge + the single next question). Tone-only
+  // — the engine still writes the clinical guidance. Optional in the parse (defensive) though the tool
+  // marks it required, so a drifting model never breaks adjudication.
+  reply: z.string().optional(),
 });
 
 export type ProposeInput = z.infer<typeof proposeInputSchema>;
@@ -182,7 +196,13 @@ export function buildSystemPrompt(
     verifiedLine,
     '',
     `Reply to the patient in ${language}.`,
-    'On every turn, call the propose_assessment tool with the typed evidence and a risk estimate.',
+    'This is a CONVERSATION: read the FULL history and build on what the patient already told you —',
+    'do not re-ask what you already know. On every turn, call the propose_assessment tool with the',
+    'typed evidence, a risk estimate, AND a `reply`: your warm conversational turn to the patient —',
+    'briefly acknowledge what they said, then ask the SINGLE most useful next question (one at a time).',
+    'When you have enough to hand off, make `reply` a short, kind closing line. The `reply` is',
+    'conversational ONLY — it must never contain a disposition, urgency, triage level, or next-step',
+    'instruction; the engine writes the clinical guidance the patient sees.',
     'Extract only what the patient actually said; do not invent vitals or ages.',
   ];
 
@@ -322,5 +342,11 @@ export function parseProposal(
     modelVersion,
   };
 
-  return { evidence, riskEstimate, assistantText, modelVersion };
+  // Prefer the model's structured `reply` (its conversational turn). With forced tool_choice the model
+  // usually returns no free text, so the tool's `reply` field is the reliable conversational channel —
+  // this is what makes the chat feel like a real multi-turn conversation rather than a one-shot card.
+  const reply = parsed.data.reply?.trim();
+  const conversational = reply && reply.length > 0 ? reply : assistantText;
+
+  return { evidence, riskEstimate, assistantText: conversational, modelVersion };
 }
