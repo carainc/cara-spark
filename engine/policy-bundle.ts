@@ -1,17 +1,15 @@
 /**
- * Policy bundle (FR-2) — schema + checksum + version + sign/verify (T2 hardens this).
- * A bundle loads only if its checksum + signature are valid. `DEFAULT_POLICY` is real DATA
- * (so the engine has a bundle to run the moment T1 lands the functions); checksum/sign/verify
- * are NotImplemented stubs until T1/T2.
- *
- * Threshold values below are placeholders that T1 reconciles with VA-5's
- * DEFAULT_URGENCY_THRESHOLDS (see research/T1-va5-port-spec.md).
+ * Policy bundle (FR-2) — checksum + create + verify. The checksum is the "tamper-proof" claim:
+ * editing a rule/threshold changes it; editing only metadata does not. A tampered bundle fails
+ * verifyPolicyBundle, and inference-check Check 3 calls verify → a tampered bundle is rejected
+ * BEFORE adjudication. T2 (CAR-2363) adds the HMAC signature. Ported from VA-5. Pure — no AI, no DB.
  */
-import type { BundleVerification, PolicyBundle, RedFlagRule, UrgencyThresholds } from './types';
-import { ALLOWED_ACTIONS } from './types';
-import { notImplemented } from './_stub';
+import { createHash } from 'node:crypto';
+import type { PolicyBundle, UrgencyThresholds } from './types';
+import { ALLOWED_ACTIONS, allowedActionSchema } from './types';
+import { DEFAULT_RED_FLAG_RULES } from './redflags';
 
-// Reconciled with VA-5 DEFAULT_URGENCY_THRESHOLDS (research/T1-va5-port-spec.md §2.1).
+// Reconciled with VA-5 DEFAULT_URGENCY_THRESHOLDS (research/T1-va5-port-spec.md §2.7).
 export const DEFAULT_URGENCY_THRESHOLDS: UrgencyThresholds = {
   abstentionThreshold: 0.3,
   oodThreshold: 0.7,
@@ -19,53 +17,123 @@ export const DEFAULT_URGENCY_THRESHOLDS: UrgencyThresholds = {
   escalateThreshold: 0.7,
   urgentThreshold: 0.5,
   immediateCallbackThreshold: 0.8,
-  selfCareConfidenceThreshold: 0.7,
+  selfCareConfidenceThreshold: 0.8,
 };
 
-/**
- * The demo's failsafe save (beat 1): an infant under 3 months with a fever ≥ 100.4°F (38°C)
- * is an emergency-department referral, full stop — the model cannot soften it.
- */
-export const DEFAULT_RED_FLAG_RULES: RedFlagRule[] = [
-  {
-    id: 'infant-fever-floor',
-    name: 'Infant fever floor',
-    description: 'Infant < 3 months with temp ≥ 100.4°F (38°C) → emergency evaluation.',
-    conditions: [
-      { factType: 'patient_age_months', operator: 'lte', value: 3 },
-      { factType: 'vital_temperature', operator: 'gte', value: 100.4 },
-    ],
-    action: 'ED_OR_911_GUIDANCE',
-    enabled: true,
-  },
+export const DEFAULT_PROHIBITED_PATTERNS = [
+  'dosage recommendation',
+  'prescribe',
+  'diagnose',
+  'you have',
+  'treatment plan',
+  'take this medication',
+  'increase your dose',
+  'decrease your dose',
+  'stop taking',
 ];
 
-export const DEFAULT_POLICY: PolicyBundle = {
+/** Stable canonical JSON — object keys sorted at every level; arrays left in order. */
+function canonicalize(value: unknown): string {
+  return JSON.stringify(value, (_key, val) => {
+    if (val && typeof val === 'object' && !Array.isArray(val)) {
+      return Object.keys(val as Record<string, unknown>)
+        .sort()
+        .reduce<Record<string, unknown>>((acc, k) => {
+          acc[k] = (val as Record<string, unknown>)[k];
+          return acc;
+        }, {});
+    }
+    return val;
+  });
+}
+
+/** SHA-256 over {redFlagRules, urgencyThresholds, allowedActions, prohibitedOutputPatterns} — metadata excluded. */
+export function computeBundleChecksum(bundle: PolicyBundle): string {
+  const content = {
+    redFlagRules: bundle.redFlagRules,
+    urgencyThresholds: bundle.urgencyThresholds,
+    allowedActions: bundle.allowedActions,
+    prohibitedOutputPatterns: bundle.prohibitedOutputPatterns,
+  };
+  return createHash('sha256').update(canonicalize(content)).digest('hex');
+}
+
+export interface CreateBundleConfig {
+  policyVersion: string;
+  signedBy: string;
+  changeNote: string;
+  redFlagRules: PolicyBundle['redFlagRules'];
+  urgencyThresholds: UrgencyThresholds;
+  allowedActions: PolicyBundle['allowedActions'];
+  prohibitedOutputPatterns: string[];
+}
+
+export function createPolicyBundle(config: CreateBundleConfig): PolicyBundle {
+  const bundle: PolicyBundle = {
+    metadata: {
+      policyVersion: config.policyVersion,
+      checksum: '',
+      signedBy: config.signedBy,
+      createdAt: new Date().toISOString(),
+      changeNote: config.changeNote,
+    },
+    redFlagRules: config.redFlagRules,
+    urgencyThresholds: config.urgencyThresholds,
+    allowedActions: config.allowedActions,
+    prohibitedOutputPatterns: config.prohibitedOutputPatterns,
+  };
+  bundle.metadata.checksum = computeBundleChecksum(bundle);
+  return bundle;
+}
+
+export interface BundleVerifyResult {
+  valid: boolean;
+  errors: string[];
+}
+
+/** T1: checksum + structure. T2 extends with signature verification. */
+export function verifyPolicyBundle(bundle: PolicyBundle): BundleVerifyResult {
+  const errors: string[] = [];
+  const m = bundle.metadata;
+  if (!m?.policyVersion) errors.push('Missing policyVersion');
+  if (!m?.checksum) errors.push('Missing checksum');
+  if (!m?.signedBy) errors.push('Missing signedBy');
+
+  const recomputed = computeBundleChecksum(bundle);
+  if (m?.checksum && recomputed !== m.checksum) {
+    errors.push(`Checksum mismatch (expected ${m.checksum}, got ${recomputed})`);
+  }
+  if (!Array.isArray(bundle.allowedActions) || bundle.allowedActions.length === 0) {
+    errors.push('allowedActions is empty');
+  } else {
+    for (const a of bundle.allowedActions) {
+      if (!allowedActionSchema.safeParse(a).success) errors.push(`Invalid action: ${String(a)}`);
+    }
+  }
+  if (!bundle.urgencyThresholds) errors.push('Missing urgencyThresholds');
+  if (!Array.isArray(bundle.redFlagRules)) errors.push('redFlagRules is not an array');
+
+  return { valid: errors.length === 0, errors };
+}
+
+const DEFAULT_POLICY_BASE: PolicyBundle = {
   metadata: {
-    policyVersion: 'default-0.1.0',
-    checksum: '', // computed by T2's computeBundleChecksum
+    policyVersion: '1.0.0',
+    checksum: '',
     signedBy: 'cara-spark-default',
-    createdAt: '2026-06-13T00:00:00.000Z',
-    changeNote: 'Hand-authored default bundle (T3 AI-builder was CUT).',
+    createdAt: '2026-03-08T00:00:00.000Z',
+    changeNote: 'Initial default policy bundle (hand-authored; T3 AI-builder was CUT).',
   },
   redFlagRules: DEFAULT_RED_FLAG_RULES,
   urgencyThresholds: DEFAULT_URGENCY_THRESHOLDS,
   allowedActions: [...ALLOWED_ACTIONS],
-  prohibitedOutputPatterns: [
-    // model must never emit a raw diagnosis/prescription or claim to be a clinician
-    'you have been diagnosed',
-    'i am a (doctor|nurse|physician)',
-  ],
+  prohibitedOutputPatterns: DEFAULT_PROHIBITED_PATTERNS,
 };
 
-export function computeBundleChecksum(_bundle: PolicyBundle): string {
-  return notImplemented('engine/policy-bundle.computeBundleChecksum');
-}
+/** The default signed-on-load bundle. The engine runs against this until a custom bundle is authored. */
+export const DEFAULT_POLICY: PolicyBundle = {
+  ...DEFAULT_POLICY_BASE,
+  metadata: { ...DEFAULT_POLICY_BASE.metadata, checksum: computeBundleChecksum(DEFAULT_POLICY_BASE) },
+};
 
-export function signBundle(_bundle: PolicyBundle, _secret: string): PolicyBundle {
-  return notImplemented('engine/policy-bundle.signBundle');
-}
-
-export function verifyPolicyBundle(_bundle: PolicyBundle, _secret: string): BundleVerification {
-  return notImplemented('engine/policy-bundle.verifyPolicyBundle');
-}
+export const DEFAULT_POLICY_BUNDLE = DEFAULT_POLICY;
