@@ -12,7 +12,7 @@
  */
 import type { AgentStatus, ChannelKind, Language, Role } from '@prisma/client';
 import { canManageAgents } from './roles';
-import { DEFAULT_POLICY_BUNDLE_VERSION, demoPhoneDid } from './bundle';
+import { DEFAULT_POLICY_BUNDLE_VERSION, demoPhoneDid, isKnownBundleVersion } from './bundle';
 
 /** Channels the creator can toggle in the console (KIOSK is provisioned elsewhere). */
 export const TOGGLEABLE_CHANNELS = ['CHAT', 'VOICE', 'PHONE'] as const;
@@ -130,4 +130,28 @@ export interface PublishAgentInput {
 export async function publishAgent(db: AgentPrisma, input: PublishAgentInput): Promise<AgentRow> {
   if (!canManageAgents(input.actorRole)) throw new Error('Forbidden: insufficient role to publish an agent.');
   return db.agent.update({ where: { id: input.agentId }, data: { status: 'PUBLISHED' } });
+}
+
+export interface SetPolicyBundleInput {
+  actorRole: Role | undefined | null;
+  agentId: string;
+  /** A version string from the available signed bundles (GET /api/bundles). */
+  policyBundleVersion: string;
+}
+
+/**
+ * Set the agent's policy bundle (tk-0017). Writes ONLY Agent.policyBundleVersion — the runtime
+ * resolves the signed bundle from this string. Guarded by manage capability AND fail-closed on an
+ * unknown version: an arbitrary string can never become an agent's safety contract. Auth still
+ * never adjudicates — it only records which signed bundle the deterministic engine should load.
+ */
+export async function setAgentPolicyBundle(db: AgentPrisma, input: SetPolicyBundleInput): Promise<AgentRow> {
+  if (!canManageAgents(input.actorRole)) throw new Error('Forbidden: insufficient role to change the policy bundle.');
+  if (!isKnownBundleVersion(input.policyBundleVersion)) {
+    throw new Error(`Unknown policy bundle version: ${input.policyBundleVersion}`);
+  }
+  return db.agent.update({
+    where: { id: input.agentId },
+    data: { policyBundleVersion: input.policyBundleVersion },
+  });
 }

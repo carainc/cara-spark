@@ -2,7 +2,117 @@
 @tailwind components;
 @tailwind utilities;
 
-html,
-body {
-  height: 100%;
+/**
+ * Cara Spark "Clinical Ledger" base (tk-0015). Accessibility is the thesis: high-contrast ink on
+ * warm paper, large readable type, visible focus rings, and full prefers-reduced-motion support.
+ * Per-tenant branding overrides --brand at the page level (Lane D) — base styling never fights it.
+ */
+
+@layer base {
+  :root {
+    /* --brand is overridden per-tenant by themeStyle(); this is the default fallback. */
+    --brand: #0f766e;
+    --brand-fg: #ffffff;
+    color-scheme: light;
+  }
+
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-paper font-sans text-body text-ink-900 antialiased;
+    /* Subtle teal mist behind everything for atmosphere — never a loud gradient. */
+    background-image: theme('backgroundImage.mist');
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-display text-ink-900;
+  }
+
+  /* High-visibility focus ring for keyboard + switch-access users (accessibility-first). */
+  :where(a, button, input, textarea, select, [tabindex]):focus-visible {
+    outline: 3px solid theme('colors.brand.500');
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  ::selection {
+    background: theme('colors.brand.200');
+    color: theme('colors.ink.900');
+  }
+}
+
+@layer components {
+  /* --- Buttons: a calm clinical instrument, generous tap target (min 44px height for a11y). --- */
+  .btn {
+    @apply inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-stamp px-5 text-body font-semibold transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn text-brand-fg shadow-sm hover:brightness-110 active:brightness-95;
+    background-color: var(--brand);
+  }
+  .btn-secondary {
+    @apply btn border-2 border-ink-line bg-paper-raised text-ink-900 hover:border-brand-300 hover:bg-brand-50;
+  }
+  .btn-ghost {
+    @apply btn px-3 text-ink-700 hover:bg-paper-sunken;
+  }
+
+  /* --- Fields: large, high-contrast borders, clear focus. --- */
+  .field {
+    @apply min-h-[2.75rem] w-full rounded-stamp border-2 border-ink-line bg-paper-raised px-3.5 text-body text-ink-900 transition-colors placeholder:text-ink-300 focus:border-brand-500 focus:outline-none;
+  }
+  .field-label {
+    @apply mb-1.5 block text-stamp font-semibold uppercase tracking-wide text-ink-500;
+  }
+
+  /* --- Cards. --- */
+  .card {
+    @apply rounded-card border border-ink-line bg-paper-raised shadow-card;
+  }
+
+  /* --- The ledger stamp: monospace, tabular figures, a tamper-evident receipt mark. The visual
+         signature of the whole product — used for checksum / signature / version chips. --- */
+  .ledger-stamp {
+    @apply inline-flex items-center gap-1.5 rounded-stamp px-2.5 py-1 font-mono text-stamp font-medium;
+    font-variant-numeric: tabular-nums;
+  }
+  .ledger-stamp-ok {
+    @apply ledger-stamp bg-verified-soft text-verified-ink shadow-stamp;
+  }
+  .ledger-stamp-fail {
+    @apply ledger-stamp bg-crisis/10 text-crisis;
+  }
+  .ledger-stamp-neutral {
+    @apply ledger-stamp bg-paper-sunken text-ink-700;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  /* Tabular numerals for any data/figures so columns of stamps align. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Respect the user's motion preference — disable the staggered reveals entirely. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
