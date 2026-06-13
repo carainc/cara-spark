@@ -1,0 +1,44 @@
+# --- Internal planning / strategy docs (NOT for the public repo) ---
+fable5-build-day-runbook.md
+cara-spark-kiosk-build-guide.md
+*runbook*.md
+*build-guide*.md
+research/
+
+# --- Took task graph: local-only for now (carries internal refs: Linear IDs,
+#     prod-isolation specifics). Un-ignore when you want a sanitized public roadmap. ---
+.took/
+
+# --- Secrets / env — BYO-key, never commit ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+credentials*.json
+*-creds*.json
+*secret*
+
+# --- Node / build ---
+node_modules/
+.next/
+out/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+*.log
+
+# --- Terraform state (never commit) ---
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+!*.tfvars.example
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
