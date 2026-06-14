@@ -118,6 +118,12 @@ DOB are captured **out-of-band** (browser → Cara OTP) and never enter model co
 or audit. The audit trail stores the *trace*, not raw transcript PHI. The kiosk and voice lanes go
 further: they are **anonymous** — they never collect an identifier at all.
 
+**Export every session.** The complete decision-trace audit trail (all recorded triage sessions, PHI-free)
+exports on demand with `pnpm export:audit` (`scripts/export-audit-log.mjs`) — full log to stdout, or
+`-- --out file.json`, `-- --limit N`, `-- --agent <id>`. A committed snapshot lives at
+[`docs/agent-trace-log.example.json`](docs/agent-trace-log.example.json). On the EC2 box (the DB is
+in-container): `sudo docker compose exec -T app node scripts/export-audit-log.mjs --out /tmp/audit.json`.
+
 ---
 
 ## Channels

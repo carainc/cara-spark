@@ -22,7 +22,8 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push --skip-generate",
     "db:migrate": "prisma migrate deploy",
-    "db:seed": "tsx db/seed.ts"
+    "db:seed": "tsx db/seed.ts",
+    "export:audit": "node scripts/export-audit-log.mjs"
   },
   "prisma": {
     "schema": "db/schema.prisma",

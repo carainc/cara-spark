@@ -1,6 +1,8 @@
 {
-  "exportedCalls": 5,
-  "calls": [
+  "exportedAt": "2026-06-14T01:01:43.209Z",
+  "sessionCount": 5,
+  "note": "PHI-free agent decision-trace audit trail. identityRef is opaque; transcripts are never persisted.",
+  "sessions": [
     {
       "callId": "cmqd1p41u0001pl011dfpmj5n",
       "agentId": "cmqcv7kp30008ma26tvaxwn2m",
@@ -10,6 +12,7 @@
       "startedAt": "2026-06-14T00:27:42.403Z",
       "endedAt": "2026-06-14T00:27:42.402Z",
       "identityRef": null,
+      "transcriptRef": null,
       "trace": [
         {
           "seq": 0,
@@ -105,6 +108,7 @@
       "startedAt": "2026-06-13T23:54:39.571Z",
       "endedAt": "2026-06-13T23:54:39.570Z",
       "identityRef": null,
+      "transcriptRef": null,
       "trace": [
         {
           "seq": 0,
@@ -163,6 +167,7 @@
       "startedAt": "2026-06-13T23:30:29.145Z",
       "endedAt": "2026-06-13T23:30:29.144Z",
       "identityRef": null,
+      "transcriptRef": null,
       "trace": [
         {
           "seq": 0,
@@ -222,6 +227,7 @@
       "startedAt": "2026-06-13T23:30:07.969Z",
       "endedAt": "2026-06-13T23:30:07.968Z",
       "identityRef": null,
+      "transcriptRef": null,
       "trace": [
         {
           "seq": 0,
@@ -281,6 +287,7 @@
       "startedAt": "2026-06-13T22:58:06.188Z",
       "endedAt": "2026-06-13T22:58:06.187Z",
       "identityRef": null,
+      "transcriptRef": null,
       "trace": [
         {
           "seq": 0,
