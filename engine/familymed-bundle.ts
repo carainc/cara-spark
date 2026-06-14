@@ -456,6 +456,685 @@ export const FAMILYMED_RED_FLAG_RULES: RedFlagRule[] = [
       })),
     ),
   ),
+
+  // ════════════════════════════════════════════════════════════════════════════════════════════
+  // Red-team self-improve expansion (tk-0011). Each gate below ADDS escalation only (→ ED), closing
+  // a documented under-triage gap where a patient's plain-language danger signal matched no existing
+  // phrase. Authored from /tmp/probe-findings.json clinical axes; ambiguity escalates UP.
+  // ════════════════════════════════════════════════════════════════════════════════════════════
+
+  // ── Abdominal / GU / OB-GYN / renal axis ──
+
+  // Bowel obstruction — obstipation + distension + vomiting in plain words (fm-abdomen only caught
+  // coded bilious/feculent vomiting or a rigid belly).
+  ...gate(
+    'fm-bowel-obstruction',
+    'Bowel obstruction (obstipation + distension + vomiting)',
+    'Not passing gas or stool (obstipation) with a distended belly and vomiting — bowel obstruction at risk of ischemia/perforation.',
+    [
+      'bowel obstruction',
+      'intestinal obstruction',
+      'obstipation',
+      "can't pass gas",
+      'cant pass gas',
+      'no gas or stool',
+      'not passing gas',
+      "haven't pooped or passed gas",
+      'havent pooped or passed gas',
+      "can't poop and throwing up",
+      'no bowel movement and vomiting',
+      'belly is bloated and vomiting',
+      'distended belly vomiting',
+      'abdominal distension with vomiting',
+    ],
+  ),
+
+  // Incarcerated / strangulated hernia — a non-reducible, tender groin/abdominal bulge (no existing
+  // gate mentions hernia or an irreducible bulge).
+  ...gate(
+    'fm-hernia',
+    'Incarcerated / strangulated hernia',
+    'A hernia/bulge that will not push back in, is hard/tender, or is red/painful with nausea — incarceration minutes-to-hours from strangulation/bowel necrosis.',
+    [
+      'incarcerated hernia',
+      'strangulated hernia',
+      'hernia stuck',
+      "hernia won't go back in",
+      'hernia wont go back in',
+      'hernia bulge painful',
+      "bulge in my groin won't go back",
+      "bulge in my groin that won't push back in",
+      "lump in my groin won't go back",
+      'painful groin bulge and vomiting',
+      'hernia hard and tender',
+      'hernia turning red and painful',
+    ],
+  ),
+
+  // Brisk lower-GI / rectal bleeding — bright-red hematochezia with presyncope (fm-bleed only caught
+  // upper-GI: hematemesis/coffee-ground/melena/maroon stool).
+  ...gate(
+    'fm-lgi-bleed',
+    'Severe lower-GI / rectal bleeding',
+    'Large-volume bright-red rectal bleeding / clots, especially with faintness or dizziness — can exsanguinate; needs emergent evaluation.',
+    [
+      'rectal bleeding',
+      'bleeding from my rectum',
+      'bleeding from my bottom',
+      'blood in the toilet',
+      'toilet full of blood',
+      'passing a lot of blood',
+      'lots of blood in my stool',
+      'lots of blood when i poop',
+      'bright red blood when i poop',
+      'hematochezia',
+      'passing clots from my rectum',
+      'bleeding from below and feel faint',
+      'bleeding from below and dizzy',
+    ],
+  ),
+
+  // Ovarian / adnexal torsion — sudden severe one-sided pelvic pain + vomiting in a non-pregnant
+  // woman (fm-ob is pregnancy-only; fm-torsion is testicular-only).
+  ...gate(
+    'fm-ovarian-torsion',
+    'Ovarian / adnexal torsion',
+    'Sudden severe one-sided pelvic/lower-belly pain with vomiting — ovarian torsion strangulates the ovary (salvage is hours).',
+    [
+      'ovarian torsion',
+      'ovary torsion',
+      'adnexal torsion',
+      'twisted ovary',
+      'sudden severe pelvic pain and vomiting',
+      'sudden one-sided pelvic pain and vomiting',
+      'sudden sharp ovary pain',
+      'sudden severe lower belly pain on one side and throwing up',
+      'ovarian cyst sudden severe pain',
+    ],
+  ),
+
+  // Priapism — prolonged painful erection (ischemic compartment syndrome of the penis; no gate).
+  ...gate(
+    'fm-priapism',
+    'Priapism (prolonged painful erection)',
+    'A painful erection lasting hours / >4 hours — ischemic priapism causes irreversible fibrosis/impotence past ~4 hours.',
+    [
+      'priapism',
+      "erection that won't go away",
+      'erection that wont go away',
+      "erection won't go down",
+      'erection wont go down',
+      "erection that won't go down",
+      'erection that wont go down',
+      'painful erection',
+      'painful erection for hours',
+      'erection lasting hours',
+      "hard on that won't go away",
+      'erection more than 4 hours',
+      'more than 4 hours',
+    ],
+  ),
+
+  // Acute urinary retention — plain "can't pee at all" + painful full bladder (the only retention
+  // phrases lived in fm-cauda as the coded token urinary_retention).
+  ...gate(
+    'fm-urinary-retention',
+    'Acute urinary retention',
+    "Complete inability to pass urine with a painful, over-distended bladder — causes obstructive renal injury; emergent drainage.",
+    [
+      "can't pee at all",
+      'cant pee at all',
+      "can't urinate at all",
+      'cannot urinate at all',
+      "can't pass urine",
+      'unable to urinate',
+      "haven't peed all day and bladder hurts",
+      'havent peed all day and bladder hurts',
+      "bladder feels like it's going to burst",
+      'bladder is going to burst',
+      'no urine and lower belly is full and painful',
+      "can't empty my bladder",
+    ],
+  ),
+
+  // Late-pregnancy vaginal bleeding / abruption — any third-trimester bleeding (fm-ob required the
+  // exact 'heavy vaginal bleeding'/'soaking a pad'/PPH substrings).
+  ...gate(
+    'fm-late-preg-bleed',
+    'Late-pregnancy vaginal bleeding / abruption',
+    'Any vaginal bleeding in late/third-trimester pregnancy (abruption/previa), or bloody/green broken waters — a life threat to mother and fetus.',
+    [
+      'bleeding in third trimester',
+      'third trimester bleeding',
+      'pregnant and bleeding',
+      'bleeding and pregnant',
+      'vaginal bleeding in late pregnancy',
+      'gush of blood pregnant',
+      'placental abruption',
+      'placenta previa bleeding',
+      'pregnant constant severe belly pain and bleeding',
+      "water broke and it's bloody",
+      'water broke and its bloody',
+      "water broke and it's green",
+    ],
+  ),
+
+  // Pyelonephritis / urosepsis by symptoms — UTI + fever + rigors + flank pain (fm-sepsis needed the
+  // coded tokens; plain 'fever' fires no temp-threshold rule in this bundle).
+  ...gate(
+    'fm-pyelonephritis',
+    'Pyelonephritis / urosepsis',
+    'Burning urination or UTI WITH fever, shaking chills/rigors, and flank/back pain (± vomiting) — ascending kidney infection that can decompensate into septic shock.',
+    [
+      'pyelonephritis',
+      'kidney infection',
+      'urosepsis',
+      'burning when i pee with fever and chills',
+      'uti with fever and chills',
+      'uti with back pain and fever',
+      'flank pain with fever and chills',
+      'flank pain and fever and vomiting',
+      'back pain fever and shaking chills',
+      'urine infection and shaking chills',
+      'kidney pain with fever',
+    ],
+  ),
+
+  // Infected / obstructing kidney stone (incl. single kidney) — stone + fever/anuria/solitary kidney
+  // (no current gate covers a stone with these complications).
+  ...gate(
+    'fm-obstructing-stone',
+    'Infected / obstructing kidney stone (incl. single kidney)',
+    'Flank pain like a stone PLUS fever/chills (obstructed infected system — emergent decompression), or a stone with anuria / in a single kidney (anuric AKI).',
+    [
+      'kidney stone with fever',
+      'kidney stone and fever',
+      'stone and fever and chills',
+      'kidney stone and shaking chills',
+      'worst flank pain and fever',
+      'kidney stone and only have one kidney',
+      'kidney stone single kidney',
+      'kidney stone and not peeing',
+      "stone and can't pee",
+      'stone and no urine',
+    ],
+  ),
+
+  // ── Cardiopulmonary & neurologic axis ──
+
+  // Aortic dissection presenting as tearing BACK/interscapular pain (fm-acs only matched the literal
+  // 'tearing chest'/'ripping chest' substrings, missing a back-only presentation).
+  ...gate(
+    'fm-dissection-back',
+    'Aortic dissection — tearing/ripping pain to the back',
+    'Sudden tearing/ripping pain, especially radiating to the back or between the shoulder blades — thoracic aortic dissection kills ~1-2%/hour untreated.',
+    [
+      'tearing pain',
+      'ripping pain',
+      'tearing sensation',
+      'ripping sensation',
+      'tearing feeling',
+      'ripping feeling',
+      'tearing in my back',
+      'ripping in my back',
+      'between my shoulder blades',
+      'between the shoulder blades',
+      'tearing between',
+      'aortic dissection',
+      'dissection',
+      'tearing pain in my back',
+      'tearing back pain',
+    ],
+  ),
+
+  // Posterior-circulation stroke — sudden vertigo + gait failure / veering (anterior FAST gate misses
+  // ~20-25% of ischemic strokes that are posterior).
+  ...gate(
+    'fm-posterior-stroke',
+    'Posterior-circulation stroke (vertigo + gait/coordination)',
+    'Sudden severe vertigo with vomiting and inability to walk / veering to one side — cardinal sign of cerebellar/posterior-circulation stroke (FAST-negative).',
+    [
+      'room is spinning',
+      'room spinning',
+      'everything is spinning',
+      'sudden vertigo',
+      "spinning and can't walk",
+      "can't walk straight",
+      'cannot walk straight',
+      'veering to one side',
+      'falling to one side',
+      'keep falling over',
+      'lost my balance suddenly',
+      'sudden loss of balance',
+      'ataxia',
+      'uncoordinated',
+      'vertigo and vomiting',
+    ],
+  ),
+
+  // Meningitis / encephalitis — headache + fever + photophobia (fm-headache caught 'stiff neck' but
+  // not photophobia or the lay word 'meningitis').
+  ...gate(
+    'fm-meningitis',
+    'Meningitis / encephalitis (photophobia + neck stiffness)',
+    'Headache with fever and light hurting the eyes (photophobia) ± a neck too stiff to bend — bacterial meningitis/encephalitis is hours-critical.',
+    [
+      'light hurts my eyes',
+      'light really hurts my eyes',
+      "can't stand the light",
+      'cannot stand bright light',
+      'bright light hurts',
+      'photophobia',
+      'stiff neck and fever',
+      'neck stiff and fever',
+      "can't touch chin to chest",
+      'cannot bend my neck',
+      "can't bend my neck forward",
+      'headache fever stiff neck',
+      'meningitis',
+      'encephalitis',
+    ],
+  ),
+
+  // Pneumothorax (collapsed lung) — sudden one-sided STABBING pleuritic pain + SOB (fm-acs keys on
+  // pressure/tightness/crushing; fm-dyspnea needs severe-distress words).
+  ...gate(
+    'fm-pneumothorax',
+    'Pneumothorax (collapsed lung) — sudden one-sided chest pain + SOB',
+    'Sudden sharp/stabbing one-sided chest pain with shortness of breath / a sense the lung collapsed — tension pneumothorax is rapidly fatal; spontaneous needs urgent decompression.',
+    [
+      'collapsed lung',
+      'lung collapsed',
+      'pneumothorax',
+      'tension pneumothorax',
+      'sudden sharp pain on one side',
+      'sharp stabbing pain on one side',
+      'stabbing pain when i breathe',
+      'sharp pain when i breathe in',
+      'stabbing chest pain on one side',
+      'sudden one-sided chest pain',
+      "can't take a deep breath",
+      'cannot take a full breath',
+    ],
+  ),
+
+  // Cardiac tamponade — breathlessness + lightheadedness + bulging neck veins (its distinctive
+  // descriptors match no existing gate).
+  ...gate(
+    'fm-tamponade',
+    'Cardiac tamponade (neck-vein distension + breathlessness)',
+    'Increasing breathlessness and lightheadedness with bulging neck veins / known fluid around the heart — obstructive shock minutes-to-hours from arrest.',
+    [
+      'cardiac tamponade',
+      'tamponade',
+      'neck veins bulging',
+      'neck veins sticking out',
+      'neck veins are bulging out',
+      'veins in my neck are bulging',
+      'muffled heartbeat',
+      'fluid around my heart',
+      'fluid around the heart',
+      'pericardial effusion',
+    ],
+  ),
+
+  // Generalized seizure described WITHOUT the word "seizure" (fm-seizure only matched the clinical
+  // words; bystanders type "jerking/shaking, eyes rolled back").
+  ...gate(
+    'fm-seizure-lay',
+    'Generalized seizure — lay descriptors (jerking / shaking / eyes rolled back)',
+    'Witnessed whole-body jerking/shaking, eyes rolled back, foaming at the mouth, or tongue-biting — a first-time generalized seizure warrants ED evaluation.',
+    [
+      'whole body jerking',
+      'whole body shaking',
+      'body started jerking',
+      'started shaking uncontrollably',
+      'shaking uncontrollably',
+      'eyes rolled back',
+      'eyes rolling back',
+      'jerking and shaking',
+      'stiffened and started shaking',
+      'went stiff and shook',
+      'foaming at the mouth',
+      'bit his tongue',
+      'bit her tongue',
+      'uncontrollable jerking',
+    ],
+  ),
+
+  // Status epilepticus / repeated seizures by description ("wouldn't stop", "didn't wake up between")
+  // — fm-seizure misses the natural descriptions that don't contain "seizure"/"convulsion".
+  ...gate(
+    'fm-status-epilepticus',
+    'Status epilepticus — prolonged or repeated seizures / no recovery',
+    'Convulsions that would not stop, lasted >5 minutes, came back to back, or with no waking up between — a true 911 emergency with rising mortality per minute.',
+    [
+      "seizure that won't stop",
+      "seizure won't stop",
+      "shaking wouldn't stop",
+      'shaking would not stop',
+      'kept seizing',
+      'kept convulsing',
+      'one seizure after another',
+      'seizures back to back',
+      'back to back seizures',
+      "didn't wake up between",
+      'did not wake up between',
+      'still shaking after 5 minutes',
+      'shaking for more than 5 minutes',
+      'status epilepticus',
+    ],
+  ),
+
+  // Hypertensive emergency — very high BP reading + end-organ symptoms (no BP-aware gate exists in
+  // either bundle).
+  ...gate(
+    'fm-hypertensive-emergency',
+    'Hypertensive emergency (severe BP + end-organ symptoms)',
+    'Markedly elevated blood pressure with end-organ symptoms (severe headache, vision change, chest pain, confusion) — needs the ED for controlled lowering.',
+    [
+      'blood pressure is 2',
+      'blood pressure 2',
+      'bp is 2',
+      'bp of 2',
+      'blood pressure is 190',
+      'blood pressure is 200',
+      'blood pressure is over 180',
+      "blood pressure won't come down",
+      'blood pressure sky high',
+      'blood pressure is dangerously high',
+      'hypertensive emergency',
+      'hypertensive crisis',
+      'really high blood pressure with headache',
+    ],
+  ),
+
+  // ── Toxic / endocrine / infectious / environmental / pediatric / psych axis ──
+
+  // Opioid / sedative overdose with respiratory depression — bystander description (fm-poisoning only
+  // matched 'overdose'/'poisoning'/'took too many pills').
+  ...gate(
+    'fm-opioid-overdose',
+    'Opioid / sedative overdose (respiratory depression)',
+    'Took too much of an opioid/sedative with slow/shallow/absent breathing, pinpoint pupils, blue lips, or unrousable — or naloxone given. Kills in minutes.',
+    [
+      'overdose',
+      'overdosed',
+      'opioid',
+      'fentanyl',
+      'heroin',
+      'oxycontin',
+      'percocet',
+      'methadone',
+      'took too much',
+      'pinpoint pupils',
+      'not breathing',
+      'barely breathing',
+      'stopped breathing',
+      'slow breathing',
+      'shallow breathing',
+      'narcan',
+      'naloxone',
+      'blue lips',
+      "won't wake up",
+      'wont wake up',
+      "can't wake him",
+      'cant wake him',
+      'unresponsive after',
+      'snorted',
+      'shot up',
+    ],
+  ),
+
+  // Infant lethargy / poor feeding / floppy — the default infant safety-net is NOT merged into this
+  // bundle, so a parent's plain words for infant sepsis/meningitis/metabolic crisis miss entirely.
+  ...gate(
+    'fm-infant-distress',
+    'Infant lethargy / poor feeding / floppy (sepsis / meningitis / metabolic)',
+    'An infant who is lethargic, limp/floppy, listless, not feeding, hard to rouse, or severely dehydrated (no wet diapers, sunken/bulging soft spot) — cardinal signs of serious infant illness.',
+    [
+      'lethargic',
+      'lethargy',
+      "won't feed",
+      'wont feed',
+      'will not feed',
+      'not feeding',
+      'poor feeding',
+      'stopped feeding',
+      'floppy',
+      'limp',
+      'listless',
+      'not waking',
+      "won't wake",
+      'wont wake',
+      'very sleepy',
+      'too sleepy to feed',
+      'hard to rouse',
+      'grunting',
+      'not responding',
+      'no wet diaper',
+      'no wet diapers',
+      'dry diaper all day',
+      'sunken eyes',
+      'no tears when crying',
+      'sunken soft spot',
+      'bulging soft spot',
+      'severely dehydrated',
+      'high-pitched cry',
+      'inconsolable',
+    ],
+  ),
+
+  // Carbon monoxide poisoning — nonspecific flu-like symptoms clustering with a fuel-burning source /
+  // alarm / multiple people sick (rapidly lethal; nothing catches the clustering clue).
+  ...gate(
+    'fm-carbon-monoxide',
+    'Carbon monoxide poisoning',
+    'Headache/nausea/dizziness clustering with a CO alarm, a fuel-burning source (furnace, generator, gas/space heater, car in garage), or several people in the home sick at once.',
+    [
+      'carbon monoxide',
+      'co detector',
+      'co alarm',
+      'co poisoning',
+      'carbon monoxide detector',
+      'furnace',
+      'generator running',
+      'generator in the',
+      'gas heater',
+      'wood stove',
+      'everyone in the house',
+      'whole family is sick',
+      'everyone is sick',
+      'everyone has a headache',
+      'headache and nausea and dizzy',
+      'exhaust fumes',
+      'car running in the garage',
+      'space heater',
+    ],
+  ),
+
+  // Sickle-cell vaso-occlusive / acute chest crisis — cough/fever/SOB without the words "chest pain"
+  // (fm-acs only catches it via the 'chest pain' substring).
+  ...gate(
+    'fm-sickle-cell-crisis',
+    'Sickle-cell crisis / acute chest syndrome',
+    'A sickle-cell patient with a pain crisis, or with cough/fever/shortness of breath (acute chest syndrome — the leading cause of death in sickle-cell disease).',
+    [
+      'sickle cell',
+      'sickle-cell',
+      'vaso-occlusive',
+      'vaso occlusive',
+      'vasoocclusive',
+      'acute chest syndrome',
+      'pain crisis',
+      'sickle crisis',
+      'sickle cell crisis',
+    ],
+  ),
+
+  // Anaphylaxis in natural language — lip/tongue swelling, throat closing, hives + breathing trouble
+  // (fm-anaphylaxis relied on coded/adjacent phrases a patient won't type verbatim).
+  ...gate(
+    'fm-anaphylaxis-nl',
+    'Anaphylaxis (natural-language lip/tongue/throat swelling)',
+    'Lips/tongue/face swelling, throat closing, or hives all over after an exposure (± dizziness/breathing trouble) — anaphylaxis is minutes-critical.',
+    [
+      'lip swelling',
+      'lips swelling',
+      'swollen lips',
+      'tongue swelling',
+      'tongue swollen',
+      'swollen tongue',
+      'throat closing',
+      'throat is closing',
+      'throat closing up',
+      'closing up',
+      'swelling up after',
+      'face is swelling',
+      'whole face swelling',
+      'allergic reaction',
+      'severe allergic reaction',
+      'hives all over',
+      'covered in hives',
+      'epipen',
+      'used an epipen',
+      'anaphyla',
+    ],
+  ),
+
+  // Drowning / submersion (near-drowning) — any submersion event needs ED eval for delayed pulmonary
+  // edema/hypoxia even if the child initially looks okay.
+  ...gate(
+    'fm-drowning',
+    'Drowning / submersion (near-drowning)',
+    'Any submersion event — pulled from the water/pool, went under, found face-down, swallowed a lot of water — needs ED evaluation for delayed pulmonary edema/hypoxia.',
+    [
+      'drowning',
+      'drowned',
+      'near drowning',
+      'near-drowning',
+      'almost drowned',
+      'submerged',
+      'went under the water',
+      'went under in the',
+      'pulled from the water',
+      'pulled from the pool',
+      'pulled out of the pool',
+      'found in the pool',
+      'face down in the water',
+      'swallowed a lot of water',
+      'secondary drowning',
+    ],
+  ),
+
+  // Airway / inhalation burn — house fire, soot, hoarse, singed, carbonaceous sputum (progressive
+  // airway edema; fm-dyspnea's 'stridor' requires that exact word).
+  ...gate(
+    'fm-inhalation-airway-burn',
+    'Inhalation / airway burn',
+    'Smoke inhalation or enclosed-space fire with hoarseness, facial/perinasal soot, singed nose hairs, facial burns, or coughing up black sputum — airway edema can occlude over hours.',
+    [
+      'smoke inhalation',
+      'inhaled smoke',
+      'breathing in smoke',
+      'house fire',
+      'trapped in a fire',
+      'caught in a fire',
+      'soot around',
+      'soot in his',
+      'soot in her',
+      'singed',
+      'singed nose hairs',
+      'burns to the face',
+      'facial burns',
+      'hoarse after a fire',
+      'coughing black',
+      'coughing up black',
+      'steam burn to the throat',
+      'enclosed space fire',
+    ],
+  ),
+
+  // Pediatric epiglottitis / severe upper-airway obstruction — drooling + can't swallow + noisy
+  // breathing + fever (fm-dyspnea's 'stridor' requires that exact word parents rarely use).
+  ...gate(
+    'fm-pediatric-airway',
+    'Pediatric epiglottitis / upper-airway obstruction',
+    'Drooling, inability to swallow, muffled "hot potato" voice, tripod/sitting-up-to-breathe posture, or noisy/whistling breathing (± high fever) — epiglottitis is an airway emergency.',
+    [
+      'drooling',
+      'cannot swallow',
+      "can't swallow",
+      'cant swallow',
+      "won't swallow",
+      'difficulty swallowing',
+      'stridor',
+      'noisy breathing',
+      'high-pitched breathing',
+      'whistling breathing',
+      'muffled voice',
+      'hot potato voice',
+      'tripod position',
+      'sitting up to breathe',
+      'epiglottitis',
+      'barky cough',
+      'retractions',
+    ],
+  ),
+
+  // Acute psychosis / mania / severe agitation with danger — the mental-health gate only matched
+  // explicit suicide/self-harm/homicide phrases; floridly psychotic/manic/agitated misses.
+  ...gate(
+    'fm-acute-agitation-psychosis',
+    'Acute psychosis / mania / severe agitation',
+    'Hearing voices / seeing things, hallucinations, paranoia with aggression, mania (no sleep for days), or violent uncontrollable agitation — danger to self/others, possible organic delirium.',
+    [
+      'hearing voices',
+      'seeing things',
+      "seeing things that aren't there",
+      'hallucinating',
+      'hallucinations',
+      'psychotic',
+      'psychosis',
+      'severe agitation',
+      'extremely agitated',
+      'violent and out of control',
+      'out of control',
+      "can't be controlled",
+      'manic',
+      "hasn't slept in days",
+      'not slept in days',
+      'paranoid and aggressive',
+      'threatening to hurt',
+      'completely detached from reality',
+    ],
+  ),
+
+  // Febrile neutropenic / immunocompromised patient — fever on chemo/transplant (the default rf-010
+  // needs condition=="immunocompromised" exactly AND temp>101.3, and is not in this bundle).
+  ...gate(
+    'fm-febrile-immunocompromised',
+    'Febrile neutropenic / immunocompromised patient',
+    'A fever in a neutropenic or immunocompromised host (on chemo, transplant, immunosuppressants, asplenic, low white count) — febrile neutropenia needs antibiotics within an hour.',
+    [
+      'neutropenic',
+      'neutropenia',
+      'febrile neutropenia',
+      'on chemo',
+      'on chemotherapy',
+      'getting chemo',
+      'immunocompromised',
+      'immunosuppressed',
+      'no immune system',
+      'low white count',
+      'low white blood cells',
+      'transplant patient',
+      'organ transplant and fever',
+      'on immunosuppressants',
+      'asplenic',
+      'no spleen',
+    ],
+  ),
 ];
 
 /**

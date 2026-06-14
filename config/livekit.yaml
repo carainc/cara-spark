@@ -21,9 +21,19 @@ rtc:
   tcp_port: 7881
   port_range_start: 50000
   port_range_end: 50100
-  # Local: false (no external address needed under compose). On the EC2 box the advertised public
-  # address comes from the NODE_IP env var (set to the Elastic IP via compose) — NOT from this file.
-  use_external_ip: false
+  # MUST be true on the standalone EC2 box. NODE_IP (the Elastic IP) is still advertised for the
+  # carrier's public RTP, but on a single-VM deploy the agent-worker AND livekit-sip run as containers
+  # on the SAME box and CANNOT reach the instance's own Elastic IP (AWS does not hairpin traffic from
+  # an instance to its own EIP — verified: a container TCP-connect to 52.203.137.71:7881 TIMES OUT,
+  # while the instance-private IP / docker-bridge address connect fine). With use_external_ip:false the
+  # server advertised ONLY the unreachable EIP as its ICE candidate, so the agent's WebRTC media
+  # PeerConnection in ctx.connect() never reached Connected and timed out after 10s
+  # ("room not connect after job_entry was called after 10 seconds") — the agent never joined and the
+  # SIP caller heard silence ("rings but no pickup"). Setting this true makes LiveKit ALSO gather its
+  # local-interface host candidates (private IP / bridge) IN ADDITION to NODE_IP, so the co-located
+  # agent gets a LAN-reachable candidate while the external carrier still uses the EIP. (Locally under
+  # plain compose this is harmless — it just adds the container's own interface as a candidate.)
+  use_external_ip: true
 
 # Keys: the devkey below is a LOCAL-ONLY placeholder (min 32 chars) so compose comes up without real
 # keys. On the box, the LIVEKIT_KEYS env var ("APIxxxx: <secret>", wired in docker-compose.yml)

@@ -363,6 +363,18 @@ export function latestUserText(chatCtx) {
   return '';
 }
 
+/**
+ * Resolve the assigned room name from the JobContext. REGRESSION GUARD (the "667 rings but no
+ * pickup" outage): in @livekit/agents v1.4.6 `ctx.room` is UNDEFINED until `ctx.connect()`, so the
+ * entrypoint's room-prefix guard must read the name from `ctx.job.room.name` (available pre-connect).
+ * Reading `ctx.room.name` alone yielded '' → the guard returned before connecting → the agent never
+ * joined → the SIP caller was stuck ringing until DTLS timeout. We prefer job.room.name and fall back
+ * to ctx.room?.name for SDK versions that populate it early. Pure; degrades to '' on any odd shape.
+ */
+export function resolveRoomName(ctx) {
+  return ctx?.job?.room?.name || ctx?.room?.name || '';
+}
+
 // ---------------------------------------------------------------------------
 // LiveKit agent wiring — only when the Agents SDK + plugins are installed (worker.Dockerfile).
 //
@@ -486,9 +498,11 @@ function buildAgent(sdks) {
 
     entry: async (ctx) => {
       // EXPLICIT dispatch already routed this room to us by name. Additionally guard on the room-name
-      // prefix so a stray room can never be answered by this worker. (ctx.room is populated before
-      // connect — JobContext exposes the assigned room from the job request.)
-      const roomName = ctx.room?.name || '';
+      // prefix so a stray room can never be answered by this worker. NOTE: in @livekit/agents v1.4.6
+      // ctx.room is UNDEFINED until ctx.connect() — the assigned room name rides on ctx.job.room.name
+      // (we fall back to ctx.room?.name for SDK versions that populate it early). Reading ctx.room.name
+      // here previously yielded '' → the prefix guard returned before connecting → caller stuck ringing.
+      const roomName = resolveRoomName(ctx);
       if (!roomName.startsWith(CFG.roomPrefix)) return;
 
       // Join the room. Verified API (@livekit/agents v1.x, JobContext.connect): the entrypoint MUST
@@ -517,9 +531,6 @@ function buildAgent(sdks) {
       // we intentionally do not pass a model `llm` here — llmNode supplies every turn's output.
       const session = new voice.AgentSession({ stt, tts, vad });
 
-      // Speak the mandatory not-an-emergency preamble VERBATIM, non-interruptibly (verified API).
-      await session.say(PREAMBLE[language], { allowInterruptions: false });
-
       // Best-effort: when the room ends, drop a post-call result into the review queue + audit trail
       // (T11). NO transcript PHI — only the final deterministic disposition + provable trace, read off
       // the agent (CascadeAgent.llmNode records the latest engine decision there each turn).
@@ -546,6 +557,11 @@ function buildAgent(sdks) {
       ctx.addShutdownCallback(onClose);
 
       await session.start({ agent, room: ctx.room });
+
+      // Speak the mandatory not-an-emergency preamble VERBATIM, non-interruptibly. MUST come AFTER
+      // session.start() — in @livekit/agents v1.4.6 say() throws "AgentSession is not running" if the
+      // session has not been started yet (the agent would join but immediately error → silent call).
+      await session.say(PREAMBLE[language], { allowInterruptions: false });
     },
   });
 }
