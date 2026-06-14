@@ -54,7 +54,7 @@ export async function configureChannelsAction(agentId: string, formData: FormDat
   for (const kind of TOGGLEABLE_CHANNELS) {
     channels[kind] = formData.get(`channel_${kind}`) != null;
   }
-  await configureChannels(prisma, { actorRole: session.user.role, agentId, channels });
+  await configureChannels(prisma, { actorRole: session.user.role, tenantId: session.user.tenantId ?? '', agentId, channels });
   revalidatePath(`/console/agents/${agentId}`);
 }
 
@@ -65,8 +65,9 @@ export async function publishAgentAction(agentId: string, formData: FormData): P
   for (const kind of TOGGLEABLE_CHANNELS) {
     channels[kind] = formData.get(`channel_${kind}`) != null;
   }
-  await configureChannels(prisma, { actorRole: session.user.role, agentId, channels });
-  await publishAgent(prisma, { actorRole: session.user.role, agentId });
+  const tenantId = session.user.tenantId ?? '';
+  await configureChannels(prisma, { actorRole: session.user.role, tenantId, agentId, channels });
+  await publishAgent(prisma, { actorRole: session.user.role, tenantId, agentId });
   revalidatePath('/console/agents');
   revalidatePath(`/console/agents/${agentId}`);
 }
@@ -78,7 +79,7 @@ export async function publishAgentAction(agentId: string, formData: FormData): P
 export async function setPolicyBundleAction(agentId: string, formData: FormData): Promise<void> {
   const session = await requireSession();
   const policyBundleVersion = String(formData.get('policyBundleVersion') ?? '').trim();
-  await setAgentPolicyBundle(prisma, { actorRole: session.user.role, agentId, policyBundleVersion });
+  await setAgentPolicyBundle(prisma, { actorRole: session.user.role, tenantId: session.user.tenantId ?? '', agentId, policyBundleVersion });
   revalidatePath(`/console/agents/${agentId}`);
 }
 
@@ -92,6 +93,7 @@ export async function updateAgentCustomizationAction(agentId: string, formData: 
   const session = await requireSession();
   await updateAgentCustomization(prisma, {
     actorRole: session.user.role,
+    tenantId: session.user.tenantId ?? '',
     agentId,
     persona: String(formData.get('persona') ?? ''),
     systemPromptExtra: String(formData.get('systemPromptExtra') ?? ''),

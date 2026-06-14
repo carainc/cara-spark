@@ -3,6 +3,7 @@ import {
   createAgent,
   configureChannels,
   publishAgent,
+  setAgentPolicyBundle,
   slugify,
   updateAgentCustomization,
   agentPublicUrl,
@@ -96,11 +97,12 @@ describe('agent create → configure → publish persists', () => {
 
     await configureChannels(store.db, {
       actorRole: 'ADMIN',
+      tenantId: TENANT,
       agentId: agent.id,
       channels: { CHAT: true, VOICE: false, PHONE: true },
     });
 
-    const published = await publishAgent(store.db, { actorRole: 'ADMIN', agentId: agent.id });
+    const published = await publishAgent(store.db, { actorRole: 'ADMIN', tenantId: TENANT, agentId: agent.id });
     expect(published.status).toBe('PUBLISHED');
 
     const fresh = await store.db.agent.findUnique({ where: { id: agent.id }, include: { channels: true } });
@@ -114,6 +116,7 @@ describe('agent create → configure → publish persists', () => {
     const agent = await createAgent(store.db, { actorRole: 'ADMIN', tenantId: TENANT, name: 'Phone agent' });
     const rows = await configureChannels(store.db, {
       actorRole: 'ADMIN',
+      tenantId: TENANT,
       agentId: agent.id,
       channels: { PHONE: true },
     });
@@ -124,9 +127,10 @@ describe('agent create → configure → publish persists', () => {
 
   it('toggling a channel off clears its phone number', async () => {
     const agent = await createAgent(store.db, { actorRole: 'ADMIN', tenantId: TENANT, name: 'Toggle agent' });
-    await configureChannels(store.db, { actorRole: 'ADMIN', agentId: agent.id, channels: { PHONE: true } });
+    await configureChannels(store.db, { actorRole: 'ADMIN', tenantId: TENANT, agentId: agent.id, channels: { PHONE: true } });
     const off = await configureChannels(store.db, {
       actorRole: 'ADMIN',
+      tenantId: TENANT,
       agentId: agent.id,
       channels: { PHONE: false },
     });
@@ -139,9 +143,47 @@ describe('agent create → configure → publish persists', () => {
       /forbidden/i,
     );
     await expect(
-      configureChannels(store.db, { actorRole: undefined, agentId: 'a', channels: { CHAT: true } }),
+      configureChannels(store.db, { actorRole: undefined, tenantId: TENANT, agentId: 'a', channels: { CHAT: true } }),
     ).rejects.toThrow(/forbidden/i);
-    await expect(publishAgent(store.db, { actorRole: null, agentId: 'a' })).rejects.toThrow(/forbidden/i);
+    await expect(publishAgent(store.db, { actorRole: null, tenantId: TENANT, agentId: 'a' })).rejects.toThrow(/forbidden/i);
+  });
+});
+
+describe('tenant isolation (SOC2) — a write cannot touch another tenant’s agent', () => {
+  let store: ReturnType<typeof makeDb>;
+  beforeEach(() => {
+    store = makeDb();
+  });
+
+  it('rejects configure / publish / set-bundle / customize when the agent is in a different tenant', async () => {
+    // An agent owned by TENANT; the attacker is a manage-capable user in OTHER tenant.
+    const agent = await createAgent(store.db, { actorRole: 'ADMIN', tenantId: TENANT, name: 'Victim' });
+    const OTHER = 'tenant_attacker';
+
+    await expect(
+      configureChannels(store.db, { actorRole: 'ADMIN', tenantId: OTHER, agentId: agent.id, channels: { CHAT: true } }),
+    ).rejects.toThrow(/your tenant|forbidden|not found/i);
+    await expect(
+      publishAgent(store.db, { actorRole: 'ADMIN', tenantId: OTHER, agentId: agent.id }),
+    ).rejects.toThrow(/your tenant|forbidden|not found/i);
+    await expect(
+      setAgentPolicyBundle(store.db, { actorRole: 'ADMIN', tenantId: OTHER, agentId: agent.id, policyBundleVersion: DEFAULT_POLICY_BUNDLE_VERSION }),
+    ).rejects.toThrow(/your tenant|forbidden|not found/i);
+    await expect(
+      updateAgentCustomization(store.db, { actorRole: 'ADMIN', tenantId: OTHER, agentId: agent.id, persona: 'pwned' }),
+    ).rejects.toThrow(/your tenant|forbidden|not found/i);
+
+    // And the victim agent is untouched: still DRAFT, no persona, no channels.
+    const fresh = await store.db.agent.findUnique({ where: { id: agent.id } });
+    expect(fresh!.status).toBe('DRAFT');
+    expect(fresh!.persona ?? null).toBeNull();
+    expect(store.channels.filter((c) => c.agentId === agent.id)).toHaveLength(0);
+  });
+
+  it('a same-tenant manage user CAN write (positive control)', async () => {
+    const agent = await createAgent(store.db, { actorRole: 'ADMIN', tenantId: TENANT, name: 'Owned' });
+    const published = await publishAgent(store.db, { actorRole: 'ADMIN', tenantId: TENANT, agentId: agent.id });
+    expect(published.status).toBe('PUBLISHED');
   });
 });
 
@@ -155,6 +197,7 @@ describe('agent customization (tk-0015) — persona / extra prompt / additional 
     const agent = await createAgent(store.db, { actorRole: 'ADMIN', tenantId: TENANT, name: 'Custom' });
     const updated = await updateAgentCustomization(store.db, {
       actorRole: 'ADMIN',
+      tenantId: TENANT,
       agentId: agent.id,
       persona: 'Warm, plain-language, reassuring.',
       systemPromptExtra: 'Use short sentences.',
@@ -169,6 +212,7 @@ describe('agent customization (tk-0015) — persona / extra prompt / additional 
     const agent = await createAgent(store.db, { actorRole: 'ADMIN', tenantId: TENANT, name: 'Trim' });
     const updated = await updateAgentCustomization(store.db, {
       actorRole: 'ADMIN',
+      tenantId: TENANT,
       agentId: agent.id,
       persona: '  spaced  ',
       systemPromptExtra: '   ',
@@ -181,7 +225,7 @@ describe('agent customization (tk-0015) — persona / extra prompt / additional 
 
   it('is role-guarded — a user with no manage capability cannot customize', async () => {
     await expect(
-      updateAgentCustomization(store.db, { actorRole: null, agentId: 'a', persona: 'x' }),
+      updateAgentCustomization(store.db, { actorRole: null, tenantId: TENANT, agentId: 'a', persona: 'x' }),
     ).rejects.toThrow(/forbidden/i);
   });
 });

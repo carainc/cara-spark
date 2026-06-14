@@ -96,8 +96,23 @@ export async function createAgent(db: AgentPrisma, input: CreateAgentInput): Pro
   });
 }
 
+/**
+ * Tenant-isolation guard (SOC2/HITRUST). A write MUST target an agent in the actor's tenant. The
+ * detail page guards the GET render (app/console/agents/[id]/page.tsx), but server actions are
+ * independently POST-able — so every write path re-verifies ownership here and fails CLOSED (throws)
+ * on a cross-tenant or unknown agentId. Uses the existing findUnique + an explicit tenant compare.
+ */
+async function assertAgentInTenant(db: AgentPrisma, agentId: string, tenantId: string): Promise<void> {
+  const agent = await db.agent.findUnique({ where: { id: agentId } });
+  if (!agent || agent.tenantId !== tenantId) {
+    throw new Error('Forbidden: agent not found in your tenant.');
+  }
+}
+
 export interface ChannelToggleInput {
   actorRole: Role | undefined | null;
+  /** The actor's tenant — every write is scoped to it; a cross-tenant agentId is rejected. */
+  tenantId: string;
   agentId: string;
   /** Desired enabled-state per channel kind; omit a kind to leave it untouched. */
   channels: Partial<Record<ToggleableChannel, boolean>>;
@@ -109,6 +124,7 @@ export interface ChannelToggleInput {
  */
 export async function configureChannels(db: AgentPrisma, input: ChannelToggleInput): Promise<ChannelRow[]> {
   if (!canManageAgents(input.actorRole)) throw new Error('Forbidden: insufficient role to configure an agent.');
+  await assertAgentInTenant(db, input.agentId, input.tenantId);
   const out: ChannelRow[] = [];
   for (const kind of TOGGLEABLE_CHANNELS) {
     const desired = input.channels[kind];
@@ -127,17 +143,20 @@ export async function configureChannels(db: AgentPrisma, input: ChannelToggleInp
 
 export interface PublishAgentInput {
   actorRole: Role | undefined | null;
+  tenantId: string;
   agentId: string;
 }
 
-/** Flip an agent to PUBLISHED — the runtime reads this. Guarded by manage capability. */
+/** Flip an agent to PUBLISHED — the runtime reads this. Guarded by manage capability + tenant. */
 export async function publishAgent(db: AgentPrisma, input: PublishAgentInput): Promise<AgentRow> {
   if (!canManageAgents(input.actorRole)) throw new Error('Forbidden: insufficient role to publish an agent.');
+  await assertAgentInTenant(db, input.agentId, input.tenantId);
   return db.agent.update({ where: { id: input.agentId }, data: { status: 'PUBLISHED' } });
 }
 
 export interface SetPolicyBundleInput {
   actorRole: Role | undefined | null;
+  tenantId: string;
   agentId: string;
   /** A version string from the available signed bundles (GET /api/bundles). */
   policyBundleVersion: string;
@@ -154,6 +173,7 @@ export async function setAgentPolicyBundle(db: AgentPrisma, input: SetPolicyBund
   if (!isKnownBundleVersion(input.policyBundleVersion)) {
     throw new Error(`Unknown policy bundle version: ${input.policyBundleVersion}`);
   }
+  await assertAgentInTenant(db, input.agentId, input.tenantId);
   return db.agent.update({
     where: { id: input.agentId },
     data: { policyBundleVersion: input.policyBundleVersion },
@@ -162,6 +182,7 @@ export async function setAgentPolicyBundle(db: AgentPrisma, input: SetPolicyBund
 
 export interface UpdateAgentCustomizationInput {
   actorRole: Role | undefined | null;
+  tenantId: string;
   agentId: string;
   /** Short tone note. Empty/whitespace clears it (→ null). */
   persona?: string | null;
@@ -193,6 +214,7 @@ export async function updateAgentCustomization(
   if (!canManageAgents(input.actorRole)) {
     throw new Error('Forbidden: insufficient role to customize an agent.');
   }
+  await assertAgentInTenant(db, input.agentId, input.tenantId);
   return db.agent.update({
     where: { id: input.agentId },
     data: {

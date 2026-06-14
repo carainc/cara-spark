@@ -358,6 +358,21 @@ describe('parseProposal — defensive parsing of the model tool_use', () => {
     expect(out.evidence.every((e) => e.traceId === 'trc')).toBe(true);
     expect(out.riskEstimate.modelVersion).toBe(TRIAGE_MODEL);
   });
+
+  it('prefers the structured tool `reply` as the conversational assistantText (tk-0029)', () => {
+    // With forced tool_choice the model returns little/no free text; the tool `reply` field is the
+    // reliable conversational channel, so parseProposal must surface it (over any stray text block).
+    const out = parseProposal(
+      fakeMessage({ ...INFANT_FEVER_PROPOSAL, reply: 'I hear you — is the fever still climbing?' }, 'a stray text-block preamble'),
+      { traceId: 't', source: 'user_chat' },
+    );
+    expect(out.assistantText).toBe('I hear you — is the fever still climbing?');
+  });
+
+  it('falls back to text-block content when the tool omits `reply` (backward compatible)', () => {
+    const out = parseProposal(fakeMessage(INFANT_FEVER_PROPOSAL, 'fallback preamble text'), { traceId: 't', source: 'user_chat' });
+    expect(out.assistantText).toBe('fallback preamble text');
+  });
 });
 
 describe('multi-turn (tk-0029) — runTurn surfaces turnMode end-to-end (model → engine → panel)', () => {

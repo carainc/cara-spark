@@ -4,6 +4,9 @@ import { prisma } from '@/lib/db';
 import { canInvite } from '@/lib/auth/roles';
 import { InviteForm } from './invite-form';
 
+// Always render live agent data in the admin console (matches the [id] detail page).
+export const dynamic = 'force-dynamic';
+
 /**
  * Agents list — the creator's home (T14 / Lane E). Lists the tenant's agents with status +
  * enabled channels, links to create/configure, and (for admins+) the invite-a-teammate form.
