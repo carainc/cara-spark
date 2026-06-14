@@ -34,6 +34,7 @@ const {
   auraTtsModel,
   isTerminal,
   latestUserText,
+  resolveRoomName,
   failClosedGuidance,
   ensureStartSubcommand,
 } = worker as {
@@ -47,6 +48,7 @@ const {
   auraTtsModel: (l: string) => string;
   isTerminal: (a: string) => boolean;
   latestUserText: (ctx: unknown) => string;
+  resolveRoomName: (ctx: unknown) => string;
   failClosedGuidance: (l: string) => string;
   ensureStartSubcommand: (argv: string[]) => string[];
 };
@@ -260,5 +262,33 @@ describe('worker ensureStartSubcommand — the worker actually boots in producti
     const argv = ['node', 'index.mjs'];
     ensureStartSubcommand(argv);
     expect(argv).toEqual(['node', 'index.mjs']);
+  });
+});
+
+describe('worker resolveRoomName — the 667 "rings but no pickup" regression', () => {
+  // @livekit/agents v1.4.6: ctx.room is UNDEFINED until ctx.connect(); the assigned room name rides on
+  // ctx.job.room.name. The entrypoint reads the name BEFORE connect (to prefix-guard), so reading
+  // ctx.room.name alone returned '' → the guard bailed → the agent never joined → the SIP caller was
+  // stuck ringing until DTLS timeout. resolveRoomName must read job.room.name pre-connect.
+  it('reads ctx.job.room.name when ctx.room is undefined (v1.4.6 pre-connect — the bug)', () => {
+    expect(
+      resolveRoomName({ job: { room: { name: 'voicephone-agent-1-abc' } }, room: undefined }),
+    ).toBe('voicephone-agent-1-abc');
+  });
+
+  it('falls back to ctx.room.name for SDK versions that populate it early', () => {
+    expect(resolveRoomName({ job: undefined, room: { name: 'voicephone-x' } })).toBe('voicephone-x');
+  });
+
+  it('prefers job.room.name over a stale ctx.room.name', () => {
+    expect(
+      resolveRoomName({ job: { room: { name: 'voicephone-correct' } }, room: { name: 'stale' } }),
+    ).toBe('voicephone-correct');
+  });
+
+  it('degrades to empty string on an unexpected shape (cautious, no throw)', () => {
+    expect(resolveRoomName(undefined)).toBe('');
+    expect(resolveRoomName({})).toBe('');
+    expect(resolveRoomName({ job: {} })).toBe('');
   });
 });
