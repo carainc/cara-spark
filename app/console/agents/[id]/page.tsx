@@ -19,6 +19,11 @@ import { ResourceForm } from '../../resources/ResourceForm';
 import { AgentTabs } from './AgentTabs';
 import { PolicyBundleForm } from './PolicyBundleForm';
 
+// Admin console must always render LIVE agent data (channels/numbers/persona/bundle). Without this,
+// Next can serve a cached render, so an edit (especially an out-of-band DB change) looks "not
+// updated" until a hard reload.
+export const dynamic = 'force-dynamic';
+
 /**
  * Tabbed agent configuration (tk-0022; absorbs tk-0017). One screen per concern, surfacing the
  * EXISTING backends only — channels (Lane E), the signed policy bundle (engine), the referral
