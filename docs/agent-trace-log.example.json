@@ -1,0 +1,335 @@
+{
+  "exportedCalls": 5,
+  "calls": [
+    {
+      "callId": "cmqd1p41u0001pl011dfpmj5n",
+      "agentId": "cmqcv7kp30008ma26tvaxwn2m",
+      "channel": "CHAT",
+      "language": "EN",
+      "disposition": "ED_OR_911_GUIDANCE",
+      "startedAt": "2026-06-14T00:27:42.403Z",
+      "endedAt": "2026-06-14T00:27:42.402Z",
+      "identityRef": null,
+      "trace": [
+        {
+          "seq": 0,
+          "evidence": [
+            {
+              "id": "01c33174-e7db-4100-9144-62593b373b6c-m0",
+              "value": "chest pain",
+              "source": "user_chat",
+              "traceId": "01c33174-e7db-4100-9144-62593b373b6c",
+              "factType": "chief_complaint",
+              "verified": false,
+              "createdAt": "2026-06-14T00:27:42.384Z",
+              "confidence": 0.98,
+              "sourceTrust": "low",
+              "modelVersion": "claude-opus-4-8"
+            },
+            {
+              "id": "01c33174-e7db-4100-9144-62593b373b6c-m1",
+              "value": "chest pain",
+              "source": "user_chat",
+              "traceId": "01c33174-e7db-4100-9144-62593b373b6c",
+              "factType": "symptom",
+              "verified": false,
+              "createdAt": "2026-06-14T00:27:42.384Z",
+              "confidence": 0.98,
+              "sourceTrust": "low",
+              "modelVersion": "claude-opus-4-8"
+            }
+          ],
+          "redFlag": {
+            "hits": [
+              {
+                "action": "ED_OR_911_GUIDANCE",
+                "ruleId": "fm-acs-symptom-0",
+                "ruleName": "Chest pain — ACS / dangerous chest pain",
+                "timestamp": "2026-06-14T00:27:42.395Z",
+                "matchedFactIds": [
+                  "01c33174-e7db-4100-9144-62593b373b6c-m1"
+                ]
+              },
+              {
+                "action": "ED_OR_911_GUIDANCE",
+                "ruleId": "fm-acs-chief_complaint-0",
+                "ruleName": "Chest pain — ACS / dangerous chest pain",
+                "timestamp": "2026-06-14T00:27:42.395Z",
+                "matchedFactIds": [
+                  "01c33174-e7db-4100-9144-62593b373b6c-m0"
+                ]
+              }
+            ],
+            "triggered": true
+          },
+          "risk": {
+            "pUrgent": 0.4,
+            "oodScore": 0.2,
+            "pRoutine": 0.2,
+            "pCritical": 0.4,
+            "confidence": 0.5,
+            "reasonCodes": [
+              "chest_pain",
+              "needs_more_detail"
+            ],
+            "modelVersion": "claude-opus-4-8",
+            "evidenceCoverageScore": 0.15
+          },
+          "decision": {
+            "action": "ED_OR_911_GUIDANCE",
+            "policyVersion": "familymed-v1",
+            "decisionReason": "Red flag triggered: Chest pain — ACS / dangerous chest pain, Chest pain — ACS / dangerous chest pain",
+            "ruleIdsApplied": [
+              "fm-acs-symptom-0",
+              "fm-acs-chief_complaint-0"
+            ],
+            "requiresHumanReview": true,
+            "requiresSummarySuppression": true
+          },
+          "bundleVersion": "familymed-v1",
+          "bundleChecksum": "94bf51cf04a39ca68fbe922748b76fd5bb2299fab670b2dffdc54b134c387adf",
+          "intervention": true,
+          "ruleIdsFired": [
+            "fm-acs-symptom-0",
+            "fm-acs-chief_complaint-0"
+          ]
+        }
+      ]
+    },
+    {
+      "callId": "cmqd0im360001rz01bckhlw2z",
+      "agentId": "cmqcv7kp30008ma26tvaxwn2m",
+      "channel": "CHAT",
+      "language": "EN",
+      "disposition": "SELF_CARE_INFO_ONLY",
+      "startedAt": "2026-06-13T23:54:39.571Z",
+      "endedAt": "2026-06-13T23:54:39.570Z",
+      "identityRef": null,
+      "trace": [
+        {
+          "seq": 0,
+          "evidence": [
+            {
+              "id": "9f352a92-3121-4d8f-a1b3-050372bbd340-m0",
+              "value": "hunger",
+              "source": "user_chat",
+              "traceId": "9f352a92-3121-4d8f-a1b3-050372bbd340",
+              "factType": "chief_complaint",
+              "verified": false,
+              "createdAt": "2026-06-13T23:54:39.208Z",
+              "confidence": 0.5,
+              "sourceTrust": "low",
+              "modelVersion": "claude-opus-4-8"
+            }
+          ],
+          "redFlag": {
+            "hits": [],
+            "triggered": false
+          },
+          "risk": {
+            "pUrgent": 0.05,
+            "oodScore": 0.6,
+            "pRoutine": 0.85,
+            "pCritical": 0.01,
+            "confidence": 0.4,
+            "reasonCodes": [
+              "minimal_info",
+              "nonspecific_complaint"
+            ],
+            "modelVersion": "claude-opus-4-8",
+            "evidenceCoverageScore": 0.1
+          },
+          "decision": {
+            "action": "SELF_CARE_INFO_ONLY",
+            "policyVersion": "familymed-v1",
+            "decisionReason": "social/resource need — routed to community resources, no clinical concern detected",
+            "ruleIdsApplied": [],
+            "requiresHumanReview": false,
+            "requiresSummarySuppression": false
+          },
+          "bundleVersion": "familymed-v1",
+          "bundleChecksum": "94bf51cf04a39ca68fbe922748b76fd5bb2299fab670b2dffdc54b134c387adf",
+          "intervention": true,
+          "ruleIdsFired": []
+        }
+      ]
+    },
+    {
+      "callId": "cmqcznixl0005p601djughgav",
+      "agentId": "cmqczfgpk0001p617lpkwb1uy",
+      "channel": "CHAT",
+      "language": "EN",
+      "disposition": "SELF_CARE_INFO_ONLY",
+      "startedAt": "2026-06-13T23:30:29.145Z",
+      "endedAt": "2026-06-13T23:30:29.144Z",
+      "identityRef": null,
+      "trace": [
+        {
+          "seq": 0,
+          "evidence": [
+            {
+              "id": "3ec3a4a9-9d1b-4ff7-90cf-69d552e64200-m0",
+              "value": "requesting information about free food / open food bank resources",
+              "source": "user_chat",
+              "traceId": "3ec3a4a9-9d1b-4ff7-90cf-69d552e64200",
+              "factType": "chief_complaint",
+              "verified": false,
+              "createdAt": "2026-06-13T23:30:28.836Z",
+              "confidence": 0.9,
+              "sourceTrust": "low",
+              "modelVersion": "claude-opus-4-8"
+            }
+          ],
+          "redFlag": {
+            "hits": [],
+            "triggered": false
+          },
+          "risk": {
+            "pUrgent": 0.05,
+            "oodScore": 0.7,
+            "pRoutine": 0.9,
+            "pCritical": 0.01,
+            "confidence": 0.6,
+            "reasonCodes": [
+              "non_clinical_request",
+              "resource_navigation",
+              "food_access"
+            ],
+            "modelVersion": "claude-opus-4-8",
+            "evidenceCoverageScore": 0.3
+          },
+          "decision": {
+            "action": "SELF_CARE_INFO_ONLY",
+            "policyVersion": "familymed-v1",
+            "decisionReason": "social/resource need — routed to community resources, no clinical concern detected",
+            "ruleIdsApplied": [],
+            "requiresHumanReview": false,
+            "requiresSummarySuppression": false
+          },
+          "bundleVersion": "familymed-v1",
+          "bundleChecksum": "94bf51cf04a39ca68fbe922748b76fd5bb2299fab670b2dffdc54b134c387adf",
+          "intervention": true,
+          "ruleIdsFired": []
+        }
+      ]
+    },
+    {
+      "callId": "cmqczn2ld0001p601by7skc61",
+      "agentId": "cmqczfgpk0001p617lpkwb1uy",
+      "channel": "CHAT",
+      "language": "EN",
+      "disposition": "SELF_CARE_INFO_ONLY",
+      "startedAt": "2026-06-13T23:30:07.969Z",
+      "endedAt": "2026-06-13T23:30:07.968Z",
+      "identityRef": null,
+      "trace": [
+        {
+          "seq": 0,
+          "evidence": [
+            {
+              "id": "3d4f4e79-25a5-4dff-b1fe-770c8c3864a8-m0",
+              "value": "requesting food assistance / resources",
+              "source": "user_chat",
+              "traceId": "3d4f4e79-25a5-4dff-b1fe-770c8c3864a8",
+              "factType": "chief_complaint",
+              "verified": false,
+              "createdAt": "2026-06-13T23:30:06.751Z",
+              "confidence": 0.7,
+              "sourceTrust": "low",
+              "modelVersion": "claude-opus-4-8"
+            }
+          ],
+          "redFlag": {
+            "hits": [],
+            "triggered": false
+          },
+          "risk": {
+            "pUrgent": 0.05,
+            "oodScore": 0.6,
+            "pRoutine": 0.85,
+            "pCritical": 0.01,
+            "confidence": 0.5,
+            "reasonCodes": [
+              "non_medical_request",
+              "social_need",
+              "low_info"
+            ],
+            "modelVersion": "claude-opus-4-8",
+            "evidenceCoverageScore": 0.2
+          },
+          "decision": {
+            "action": "SELF_CARE_INFO_ONLY",
+            "policyVersion": "familymed-v1",
+            "decisionReason": "social/resource need — routed to community resources, no clinical concern detected",
+            "ruleIdsApplied": [],
+            "requiresHumanReview": false,
+            "requiresSummarySuppression": false
+          },
+          "bundleVersion": "familymed-v1",
+          "bundleChecksum": "94bf51cf04a39ca68fbe922748b76fd5bb2299fab670b2dffdc54b134c387adf",
+          "intervention": true,
+          "ruleIdsFired": []
+        }
+      ]
+    },
+    {
+      "callId": "cmqcyhvqk0001o801o6wgapa9",
+      "agentId": "cmqcv7kp30008ma26tvaxwn2m",
+      "channel": "CHAT",
+      "language": "EN",
+      "disposition": "BLOCK_AND_HUMAN_HANDOFF",
+      "startedAt": "2026-06-13T22:58:06.188Z",
+      "endedAt": "2026-06-13T22:58:06.187Z",
+      "identityRef": null,
+      "trace": [
+        {
+          "seq": 0,
+          "evidence": [
+            {
+              "id": "9bdfaacc-3b13-4f75-9cf1-725ecf1df5ff-m0",
+              "value": "seeking food / hunger",
+              "source": "user_chat",
+              "traceId": "9bdfaacc-3b13-4f75-9cf1-725ecf1df5ff",
+              "factType": "chief_complaint",
+              "verified": false,
+              "createdAt": "2026-06-13T22:58:06.183Z",
+              "confidence": 0.6,
+              "sourceTrust": "low",
+              "modelVersion": "claude-opus-4-8"
+            }
+          ],
+          "redFlag": {
+            "hits": [],
+            "triggered": false
+          },
+          "risk": {
+            "pUrgent": 0.1,
+            "oodScore": 0.6,
+            "pRoutine": 0.8,
+            "pCritical": 0.02,
+            "confidence": 0.3,
+            "reasonCodes": [
+              "non_medical_request",
+              "insufficient_evidence",
+              "social_need"
+            ],
+            "modelVersion": "claude-opus-4-8",
+            "evidenceCoverageScore": 0.1
+          },
+          "decision": {
+            "action": "BLOCK_AND_HUMAN_HANDOFF",
+            "policyVersion": "1.0.0",
+            "decisionReason": "Evidence coverage 0.10 below review threshold 0.4",
+            "ruleIdsApplied": [],
+            "requiresHumanReview": true,
+            "requiresSummarySuppression": false
+          },
+          "bundleVersion": "1.0.0",
+          "bundleChecksum": "6fcb011f44d36fe011022f30ff4c76e432bf74056c7c0cb6578752f7cfc2ed2e",
+          "intervention": true,
+          "ruleIdsFired": []
+        }
+      ]
+    }
+  ]
+}
