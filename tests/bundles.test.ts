@@ -116,7 +116,16 @@ describe('setAgentPolicyBundle — guarded + fail-closed on an unknown version',
     }) as AgentRow);
     return {
       update,
-      db: { agent: { create: vi.fn(), update, findUnique: vi.fn() }, channel: { upsert: vi.fn() } } as unknown as AgentPrisma,
+      db: {
+        agent: {
+          create: vi.fn(),
+          update,
+          // The tenant-isolation guard (assertAgentInTenant) findUnique's the agent first; return one
+          // owned by 't1' so the authorized-write test passes the ownership check.
+          findUnique: vi.fn(async () => ({ id: 'agent_1', tenantId: 't1', name: 'A', slug: 'a', status: 'DRAFT', language: 'EN', policyBundleVersion: DEFAULT_POLICY_BUNDLE_VERSION }) as AgentRow),
+        },
+        channel: { upsert: vi.fn() },
+      } as unknown as AgentPrisma,
     };
   }
 
@@ -124,6 +133,7 @@ describe('setAgentPolicyBundle — guarded + fail-closed on an unknown version',
     const { db, update } = mockDb();
     const row = await setAgentPolicyBundle(db, {
       actorRole: 'ADMIN',
+      tenantId: 't1',
       agentId: 'agent_1',
       policyBundleVersion: DEFAULT_POLICY_BUNDLE_VERSION,
     });
@@ -137,7 +147,7 @@ describe('setAgentPolicyBundle — guarded + fail-closed on an unknown version',
   it('rejects an unknown version WITHOUT writing (fail-closed)', async () => {
     const { db, update } = mockDb();
     await expect(
-      setAgentPolicyBundle(db, { actorRole: 'ADMIN', agentId: 'agent_1', policyBundleVersion: 'evil-bundle' }),
+      setAgentPolicyBundle(db, { actorRole: 'ADMIN', tenantId: 't1', agentId: 'agent_1', policyBundleVersion: 'evil-bundle' }),
     ).rejects.toThrow(/Unknown policy bundle/);
     expect(update).not.toHaveBeenCalled();
   });
@@ -145,7 +155,7 @@ describe('setAgentPolicyBundle — guarded + fail-closed on an unknown version',
   it('rejects an actor without manage capability', async () => {
     const { db, update } = mockDb();
     await expect(
-      setAgentPolicyBundle(db, { actorRole: null, agentId: 'agent_1', policyBundleVersion: DEFAULT_POLICY_BUNDLE_VERSION }),
+      setAgentPolicyBundle(db, { actorRole: null, tenantId: 't1', agentId: 'agent_1', policyBundleVersion: DEFAULT_POLICY_BUNDLE_VERSION }),
     ).rejects.toThrow(/Forbidden/);
     expect(update).not.toHaveBeenCalled();
   });
